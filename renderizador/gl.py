@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+    #!/usr/bin/env python3
 # -*- coding: UTF-8 -*-
 
 # pylint: disable=invalid-name
@@ -44,14 +44,20 @@ class GL:
         # você pode assumir inicialmente o desenho dos pontos com a cor emissiva (emissiveColor).
 
         # O print abaixo é só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
-        print("Polypoint2D : pontos = {0}".format(point)) # imprime no terminal pontos
-        print("Polypoint2D : colors = {0}".format(colors)) # imprime no terminal as cores
+        #print("Polypoint2D : pontos = {0}".format(point)) # imprime no terminal pontos
+        #print("Polypoint2D : colors = {0}".format(colors)) # imprime no terminal as cores
 
         # Exemplo:
-        pos_x = GL.width//2
-        pos_y = GL.height//2
-        gpu.GPU.draw_pixel([pos_x, pos_y], gpu.GPU.RGB8, [255, 0, 0])  # altera pixel (u, v, tipo, r, g, b)
+        #pos_x = GL.width//2
+        #pos_y = GL.height//2
+        #gpu.GPU.draw_pixel([pos_x, pos_y], gpu.GPU.RGB8, [255, 0, 0])  # altera pixel (u, v, tipo, r, g, b)
         # cuidado com as cores, o X3D especifica de (0,1) e o Framebuffer de (0,255)
+        emissive = colors["emissiveColor"]
+        emissive = [int(i*255) for i in emissive]
+        
+        n_points = int(len(point)/2)
+        for i in range(n_points):
+            gpu.GPU.draw_pixel([round(point[i*2]),round(point[i*2+1])], gpu.GPU.RGB8, emissive)
         
     @staticmethod
     def polyline2D(lineSegments, colors):
@@ -66,13 +72,76 @@ class GL:
         # O parâmetro colors é um dicionário com os tipos cores possíveis, para o Polyline2D
         # você pode assumir inicialmente o desenho das linhas com a cor emissiva (emissiveColor).
 
-        print("Polyline2D : lineSegments = {0}".format(lineSegments)) # imprime no terminal
-        print("Polyline2D : colors = {0}".format(colors)) # imprime no terminal as cores
+        #print("Polyline2D : lineSegments = {0}".format(lineSegments)) # imprime no terminal
+        #print("Polyline2D : colors = {0}".format(colors)) # imprime no terminal as cores
+
+        emissive = colors["emissiveColor"]
+        emissive = [int(i*255) for i in emissive]
+
+        n_lines = int(len(lineSegments)/2 - 1)
+
+        for i in range(n_lines):
+            x0 = lineSegments[2*i]
+            y0 = lineSegments[2*i+1]
+            x1 = lineSegments[2*i+2]
+            y1 = lineSegments[2*i+3]
+            delta_x = x1-x0
+            delta_y = y1-y0
+
+
+            if delta_x == 0:
+                if delta_y>0:
+                    y=y0
+                    while y<=y1:
+                        gpu.GPU.draw_pixel([round(x0),round(y)], gpu.GPU.RGB8, emissive)
+                        y+=1
+                else:
+                    # FIX
+                    y=y1
+                    while y<=y0:
+                        gpu.GPU.draw_pixel([round(x0),round(y)], gpu.GPU.RGB8, emissive)
+                        y+=1
+
+            
+
+            else:
+                m = delta_y/delta_x
+                if abs(m) <= 1:
+                    if delta_x > 0:
+                        x = x0
+                        y = y0
+                        while x<=x1:
+                            gpu.GPU.draw_pixel([round(x),round(y)], gpu.GPU.RGB8, emissive)
+                            y+=m
+                            x+=1
+                    else:
+                        x = x1
+                        y = y1
+                        while x<=x0:
+                            gpu.GPU.draw_pixel([round(x),round(y)], gpu.GPU.RGB8, emissive)
+                            y-=m
+                            x+=1
+                else:
+                    if delta_y > 0:
+                        y = y0
+                        x = x0
+                        while y<=y1:
+                            gpu.GPU.draw_pixel([round(x),int(y)], gpu.GPU.RGB8, emissive)
+                            y+=1
+                            x+=1/m
+                    else:
+                        y = y1
+                        x = x1
+                        while y<=y0:
+                            gpu.GPU.draw_pixel([round(x),int(y)], gpu.GPU.RGB8, emissive)
+                            y+=1
+                            x+=1/m
+        
         
         # Exemplo:
-        pos_x = GL.width//2
-        pos_y = GL.height//2
-        gpu.GPU.draw_pixel([pos_x, pos_y], gpu.GPU.RGB8, [255, 0, 255])  # altera pixel (u, v, tipo, r, g, b)
+        #pos_x = GL.width//2
+        #pos_y = GL.height//2
+        #gpu.GPU.draw_pixel([pos_x, pos_y], gpu.GPU.RGB8, [255, 0, 255])  # altera pixel (u, v, tipo, r, g, b)
         # cuidado com as cores, o X3D especifica de (0,1) e o Framebuffer de (0,255)
 
     @staticmethod
