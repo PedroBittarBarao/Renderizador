@@ -15,6 +15,7 @@ import time         # Para operações com tempo
 import gpu          # Simula os recursos de uma GPU
 import math         # Funções matemáticas
 import numpy as np  # Biblioteca do Numpy
+import custom_funcs as cf
 
 class GL:
     """Classe que representa a biblioteca gráfica (Graphics Library)."""
@@ -57,7 +58,8 @@ class GL:
         
         n_points = int(len(point)/2)
         for i in range(n_points):
-            gpu.GPU.draw_pixel([round(point[i*2]),round(point[i*2+1])], gpu.GPU.RGB8, emissive)
+            if point[i*2]>=0 and point[i*2+1]>=0 and point[i*2]<GL.width and point[i*2+1]<GL.height :
+                gpu.GPU.draw_pixel([math.floor(point[i*2]),math.floor(point[i*2+1])], gpu.GPU.RGB8, emissive)
         
     @staticmethod
     def polyline2D(lineSegments, colors):
@@ -93,17 +95,16 @@ class GL:
                 if delta_y>0:
                     y=y0
                     while y<=y1:
-                        gpu.GPU.draw_pixel([round(x0),round(y)], gpu.GPU.RGB8, emissive)
+                        if x0>=0 and y>=0 and x0<GL.width and y<GL.height :
+                            gpu.GPU.draw_pixel([int(x0),math.floor(y)], gpu.GPU.RGB8, emissive)
                         y+=1
                 else:
-                    # FIX
                     y=y1
                     while y<=y0:
-                        gpu.GPU.draw_pixel([round(x0),round(y)], gpu.GPU.RGB8, emissive)
+                        if x0>=0 and y>=0 and x0<GL.width and y<GL.height :
+                            gpu.GPU.draw_pixel([int(x0),math.floor(y)], gpu.GPU.RGB8, emissive)
                         y+=1
-
             
-
             else:
                 m = delta_y/delta_x
                 if abs(m) <= 1:
@@ -111,29 +112,33 @@ class GL:
                         x = x0
                         y = y0
                         while x<=x1:
-                            gpu.GPU.draw_pixel([round(x),round(y)], gpu.GPU.RGB8, emissive)
+                            if x>=0 and y>=0 and x<GL.width and y<GL.height :
+                                gpu.GPU.draw_pixel([math.floor(x),math.floor(y)], gpu.GPU.RGB8, emissive)
                             y+=m
                             x+=1
                     else:
                         x = x1
                         y = y1
                         while x<=x0:
-                            gpu.GPU.draw_pixel([round(x),round(y)], gpu.GPU.RGB8, emissive)
-                            y-=m
+                            if x>=0 and y>=0 and x<GL.width and y<GL.height :
+                                gpu.GPU.draw_pixel([math.floor(x),math.floor(y)], gpu.GPU.RGB8, emissive)
+                            y+=m
                             x+=1
                 else:
                     if delta_y > 0:
                         y = y0
                         x = x0
                         while y<=y1:
-                            gpu.GPU.draw_pixel([round(x),int(y)], gpu.GPU.RGB8, emissive)
+                            if x>=0 and y>=0 and x<GL.width and y<GL.height :
+                                gpu.GPU.draw_pixel([math.floor(x),round(y)], gpu.GPU.RGB8, emissive)
                             y+=1
                             x+=1/m
                     else:
                         y = y1
                         x = x1
                         while y<=y0:
-                            gpu.GPU.draw_pixel([round(x),int(y)], gpu.GPU.RGB8, emissive)
+                            if x>=0 and y>=0 and x<GL.width and y<GL.height :
+                                gpu.GPU.draw_pixel([math.floor(x),round(y)], gpu.GPU.RGB8, emissive)
                             y+=1
                             x+=1/m
         
@@ -172,11 +177,37 @@ class GL:
         # quantidade de pontos é sempre multiplo de 3, ou seja, 6 valores ou 12 valores, etc.
         # O parâmetro colors é um dicionário com os tipos cores possíveis, para o TriangleSet2D
         # você pode assumir inicialmente o desenho das linhas com a cor emissiva (emissiveColor).
-        print("TriangleSet2D : vertices = {0}".format(vertices)) # imprime no terminal
-        print("TriangleSet2D : colors = {0}".format(colors)) # imprime no terminal as cores
+        #print("TriangleSet2D : vertices = {0}".format(vertices)) # imprime no terminal
+        #print("TriangleSet2D : colors = {0}".format(colors)) # imprime no terminal as cores
+
+        emissive = colors["emissiveColor"]
+        emissive = [int(i*255) for i in emissive]
+
+        n_trigs = int(len(vertices)/6)
+        for i in range(n_trigs):
+            x0 = vertices[6*i]
+            y0 = vertices[6*i+1]
+            x1 = vertices[6*i+2]
+            y1 = vertices[6*i+3]
+            x2 = vertices[6*i+4]
+            y2 = vertices[6*i+5]
+
+            print("COORDS",x0,y0,x1,y1,x2,y2)
+
+            min_x = math.floor(min(x0,x1,x2))
+            max_x = math.ceil(max(x0,x1,x2))
+            min_y = math.floor(min(y0,y1,y2))
+            max_y = math.ceil(max(y0,y1,y2))
+
+            for x in range(min_x,max_x+1):
+                for y in range(min_y,max_y+1):
+                    inside = cf.dentro([x0,y0],[x1,y1],[x2,y2],[x+0.5,y+0.5])
+                    if inside and x>=0 and y>=0 and x<GL.width and y<GL.height:
+                        gpu.GPU.draw_pixel([x, y], gpu.GPU.RGB8, emissive)
+
 
         # Exemplo:
-        gpu.GPU.draw_pixel([6, 8], gpu.GPU.RGB8, [255, 255, 0])  # altera pixel (u, v, tipo, r, g, b)
+        #gpu.GPU.draw_pixel([6, 8], gpu.GPU.RGB8, [255, 255, 0])  # altera pixel (u, v, tipo, r, g, b)
 
 
     @staticmethod
