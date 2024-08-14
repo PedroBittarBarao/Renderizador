@@ -129,7 +129,6 @@ class GL:
                         y = y0
                         x = x0
                         while y<=y1:
-                            print(x,y,math.floor(x),round(y))
                             if x>=0 and y>=0 and x<GL.width and y<GL.height :
                                 gpu.GPU.draw_pixel([math.floor(x),math.floor(y)], gpu.GPU.RGB8, emissive)
                             y+=1
