@@ -24,6 +24,7 @@ class GL:
     height = 600  # altura da tela
     near = 0.01   # plano de corte próximo
     far = 1000    # plano de corte distante
+    p = None
 
     @staticmethod
     def setup(width, height, near=0.01, far=1000):
@@ -226,12 +227,52 @@ class GL:
         # (emissiveColor), conforme implementar novos materias você deverá suportar outros
         # tipos de cores.
 
+        emissive = colors["emissiveColor"]
+        emissive = [int(i*255) for i in emissive]
+
+        """ t_transform = np.matmul(GL.t_translation,GL.t_rotation,GL.t_scale)
+        print(t_transform) """
+
+        n_trigs = int(len(point)/9)
+        for t in range(n_trigs):
+            x1 = point[9*t]
+            y1 = point[9*t+1]
+            z1 = point[9*t+2]
+            x2 = point[9*t+3]
+            y2 = point[9*t+4]
+            z2 = point[9*t+5]
+            x3 = point[9*t+6]
+            y3 = point[9*t+7]
+            z3 = point[9*t+8]
+            trig_p = np.array([[x1,x2,x3],[y1,y2,y3],[z1,z2,z3],[1,1,1]])
+            translate_m =  cf.translationMatrix(GL.t_translation[0],GL.t_translation[1],GL.t_rotation[2])
+            rotate_m = cf.rotate_quat([GL.t_rotation[:2]],GL.t_rotation[3])
+            scale_m = np.array([[GL.t_scale[0],0,0,1],
+                                    [0,GL.t_scale[1],0,1],
+                                    [0,0,GL.t_scale[2],1],
+                                    [0,0,0,1]])
+            trig_p = translate_m@rotate_m@scale_m@trig_p
+            
+            rm = np.transpose(cf.rotate_quat([GL.camRot[:2]],GL.camRot[3])) # rotation
+            tm = cf.translationMatrix(-GL.camPos[0],-GL.camPos[1],-GL.camPos[2]) # translation
+            view_m = np.matmul(rm,tm) # rotation X translation = view
+            aux_m = np.matmul(GL.pm,view_m) # perspective X rotation X translation = aux_m
+            aux2_m = np.matmul(aux_m,trig_p) # perspective X rotation X translation X points
+            NDC_m = aux2_m/aux2_m[3][0] # NDC
+            screen_m = cf.NDCToScreenMatrix(GL.width,GL.height)@NDC_m
+
+            GL.triangleSet2D([screen_m[0][0],screen_m[1][0],
+                              screen_m[0][1],screen_m[1][1],
+                              screen_m[0][2],screen_m[1][2]],colors)
+            
+
+
         # O print abaixo é só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
         print("TriangleSet : pontos = {0}".format(point)) # imprime no terminal pontos
-        print("TriangleSet : colors = {0}".format(colors)) # imprime no terminal as cores
+        #print("TriangleSet : colors = {0}".format(colors)) # imprime no terminal as cores
 
         # Exemplo de desenho de um pixel branco na coordenada 10, 10
-        gpu.GPU.draw_pixel([10, 10], gpu.GPU.RGB8, [255, 255, 255])  # altera pixel
+        #gpu.GPU.draw_pixel([10, 10], gpu.GPU.RGB8, [255, 255, 255])  # altera pixel
 
     @staticmethod
     def viewpoint(position, orientation, fieldOfView):
@@ -239,11 +280,27 @@ class GL:
         # Na função de viewpoint você receberá a posição, orientação e campo de visão da
         # câmera virtual. Use esses dados para poder calcular e criar a matriz de projeção
         # perspectiva para poder aplicar nos pontos dos objetos geométricos.
+        aspect = GL.width / GL.height
+        top = GL.near * np.tan(fieldOfView)
+        bottom = -top
+        right = top * aspect
+        left = -right
+        print("TOP: ",top)
+
+        GL.pm = np.array([[GL.near/right,0,0,0],
+                      [0,GL.near/top,0,0],
+                      [0,0,-(GL.far+GL.near)/(GL.far-GL.near),-2*GL.far*GL.near/(GL.far-GL.near)],
+                      [0,0,-1,0]])
+        
+        GL.camPos = np.array([position[0],position[1],position[2],1])
+        GL.camRot = orientation
+
 
         # O print abaixo é só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
         print("Viewpoint : ", end='')
         print("position = {0} ".format(position), end='')
         print("orientation = {0} ".format(orientation), end='')
+        print(f"aspect{aspect} ",end="")
         print("fieldOfView = {0} ".format(fieldOfView))
 
     @staticmethod
@@ -257,14 +314,21 @@ class GL:
         # Quando se entrar em um nó transform se deverá salvar a matriz de transformação dos
         # modelos do mundo em alguma estrutura de pilha.
 
+        GL.t_translation = [0,0,0]
+        GL.t_scale = [1,1,1]
+        GL.t_rotation = [0,0,0,0]
+
         # O print abaixo é só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
         print("Transform : ", end='')
         if translation:
-            print("translation = {0} ".format(translation), end='') # imprime no terminal
+            GL.t_translation = translation
+            print("translation = {0} ".format(GL.t_translation), end='') # imprime no terminal
         if scale:
-            print("scale = {0} ".format(scale), end='') # imprime no terminal
+            GL.t_scale = scale
+            print("scale = {0} ".format(GL.t_scale), end='') # imprime no terminal
         if rotation:
-            print("rotation = {0} ".format(rotation), end='') # imprime no terminal
+            GL.t_rotation = rotation
+            print("rotation = {0} ".format(GL.t_rotation), end='') # imprime no terminal
         print("")
 
     @staticmethod
