@@ -45,16 +45,16 @@ def rotate_quat(u,theta):
     """ p = point
     u = rotation axis
     theta = angle """
-    u = np.array([0,0,1]) # eixo z
+    #u = np.array([0,0,1]) # eixo z
 
-    qi = u[0]*np.sin(theta/2)
-    qj = u[1]*np.sin(theta/2)
-    qk = u[2]*np.sin(theta/2)
+    qi = u[0][0]*np.sin(theta/2)
+    qj = u[0][1]*np.sin(theta/2)
+    qk = u[0][2]*np.sin(theta/2)
     qr = np.cos(theta/2)
 
     rm = [[1-2*(qj**2+qk**2), 2*(qi*qj - qk*qr), 2*(qi*qk + qj*qr), 0],
         [2*(qi*qj + qk*qr), 1-2*(qi**2 + qk**2), 2*(qj*qk - qi*qr), 0],
-        [2*(qi*qk),2*(qj*qk+qi*qr),1-2*(qi**2 + qj**2),0],
+        [2*(qi*qk - qj*qr),2*(qj*qk+qi*qr),1-2*(qi**2 + qj**2),0],
         [0,0,0,1]]
     
     return rm

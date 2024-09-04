@@ -245,21 +245,21 @@ class GL:
             y3 = point[9*t+7]
             z3 = point[9*t+8]
             trig_p = np.array([[x1,x2,x3],[y1,y2,y3],[z1,z2,z3],[1,1,1]])
-            translate_m =  cf.translationMatrix(GL.t_translation[0],GL.t_translation[1],GL.t_rotation[2])
-            rotate_m = cf.rotate_quat([GL.t_rotation[:2]],GL.t_rotation[3])
-            scale_m = np.array([[GL.t_scale[0],0,0,1],
-                                    [0,GL.t_scale[1],0,1],
-                                    [0,0,GL.t_scale[2],1],
+            translate_m =  cf.translationMatrix(GL.t_translation[0],GL.t_translation[1],GL.t_translation[2])
+            rotate_m = cf.rotate_quat([GL.t_rotation[:3]],GL.t_rotation[3])
+            scale_m = np.array([[GL.t_scale[0],0,0,0],
+                                    [0,GL.t_scale[1],0,0],
+                                    [0,0,GL.t_scale[2],0],
                                     [0,0,0,1]])
             trig_p = translate_m@rotate_m@scale_m@trig_p
-            
-            rm = np.transpose(cf.rotate_quat([GL.camRot[:2]],GL.camRot[3])) # rotation
+            rm = np.transpose(cf.rotate_quat([GL.camRot[:3]],GL.camRot[3])) # rotation
             tm = cf.translationMatrix(-GL.camPos[0],-GL.camPos[1],-GL.camPos[2]) # translation
-            view_m = np.matmul(rm,tm) # rotation X translation = view
-            aux_m = np.matmul(GL.pm,view_m) # perspective X rotation X translation = aux_m
-            aux2_m = np.matmul(aux_m,trig_p) # perspective X rotation X translation X points
-            NDC_m = aux2_m/aux2_m[3][0] # NDC
+            view_m = rm@tm # rotation X translation = view
+            aux_m = GL.pm@view_m@trig_p # perspective X rotation X translation X points
+            NDC_m = aux_m/aux_m[3][0] # NDC
             screen_m = cf.NDCToScreenMatrix(GL.width,GL.height)@NDC_m
+            print(scale_m)
+
 
             GL.triangleSet2D([screen_m[0][0],screen_m[1][0],
                               screen_m[0][1],screen_m[1][1],
@@ -268,7 +268,7 @@ class GL:
 
 
         # O print abaixo é só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
-        print("TriangleSet : pontos = {0}".format(point)) # imprime no terminal pontos
+        #print("TriangleSet : pontos = {0}".format(point)) # imprime no terminal pontos
         #print("TriangleSet : colors = {0}".format(colors)) # imprime no terminal as cores
 
         # Exemplo de desenho de um pixel branco na coordenada 10, 10
@@ -280,28 +280,28 @@ class GL:
         # Na função de viewpoint você receberá a posição, orientação e campo de visão da
         # câmera virtual. Use esses dados para poder calcular e criar a matriz de projeção
         # perspectiva para poder aplicar nos pontos dos objetos geométricos.
+        fovy = 2*np.arctan(np.tan(fieldOfView/2) * GL.height/(np.sqrt(GL.height**2 + GL.width**2)))
+
         aspect = GL.width / GL.height
-        top = GL.near * np.tan(fieldOfView)
+        top = GL.near * np.tan(fovy)
         bottom = -top
         right = top * aspect
         left = -right
-        print("TOP: ",top)
 
         GL.pm = np.array([[GL.near/right,0,0,0],
                       [0,GL.near/top,0,0],
                       [0,0,-(GL.far+GL.near)/(GL.far-GL.near),-2*GL.far*GL.near/(GL.far-GL.near)],
                       [0,0,-1,0]])
-        
         GL.camPos = np.array([position[0],position[1],position[2],1])
         GL.camRot = orientation
 
 
         # O print abaixo é só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
-        print("Viewpoint : ", end='')
+        """ print("Viewpoint : ", end='')
         print("position = {0} ".format(position), end='')
         print("orientation = {0} ".format(orientation), end='')
         print(f"aspect{aspect} ",end="")
-        print("fieldOfView = {0} ".format(fieldOfView))
+        print("fieldOfView = {0} ".format(fieldOfView)) """
 
     @staticmethod
     def transform_in(translation, scale, rotation):
@@ -319,17 +319,17 @@ class GL:
         GL.t_rotation = [0,0,0,0]
 
         # O print abaixo é só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
-        print("Transform : ", end='')
+        #print("Transform : ", end='')
         if translation:
             GL.t_translation = translation
-            print("translation = {0} ".format(GL.t_translation), end='') # imprime no terminal
+            #print("translation = {0} ".format(GL.t_translation), end='') # imprime no terminal
         if scale:
             GL.t_scale = scale
-            print("scale = {0} ".format(GL.t_scale), end='') # imprime no terminal
+            #print("scale = {0} ".format(GL.t_scale), end='') # imprime no terminal
         if rotation:
             GL.t_rotation = rotation
-            print("rotation = {0} ".format(GL.t_rotation), end='') # imprime no terminal
-        print("")
+            #print("rotation = {0} ".format(GL.t_rotation), end='') # imprime no terminal
+        #print("")
 
     @staticmethod
     def transform_out():
@@ -340,7 +340,7 @@ class GL:
         # pilha implementada.
 
         # O print abaixo é só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
-        print("Saindo de Transform")
+        #print("Saindo de Transform")
 
     @staticmethod
     def triangleStripSet(point, stripCount, colors):
