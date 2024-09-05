@@ -33,6 +33,25 @@ class GL:
         GL.height = height
         GL.near = near
         GL.far = far
+        GL.stack = [np.array([[1,0,0,0],
+                              [0,1,0,0],
+                              [0,0,1,0],
+                              [0,0,0,1]])]
+
+    @staticmethod
+    def pushMatrix(matrix):
+        """Função usada para empilhar uma matriz."""
+        GL.stack.append(GL.getMatrix()@matrix)
+    
+    @staticmethod
+    def popMatrix():
+        """Função usada para desempilhar uma matriz."""
+        GL.stack.pop()
+    
+    @staticmethod
+    def getMatrix():
+        """Função usada para retornar a matriz do topo da pilha."""
+        return GL.stack[-1]
 
     @staticmethod
     def polypoint2D(point, colors):
@@ -245,22 +264,13 @@ class GL:
             y3 = point[9*t+7]
             z3 = point[9*t+8]
             trig_p = np.array([[x1,x2,x3],[y1,y2,y3],[z1,z2,z3],[1,1,1]])
-            translate_m =  cf.translationMatrix(GL.t_translation[0],GL.t_translation[1],GL.t_translation[2])
-            rotate_m = cf.rotate_quat([GL.t_rotation[:3]],GL.t_rotation[3])
-            scale_m = np.array([[GL.t_scale[0],0,0,0],
-                                    [0,GL.t_scale[1],0,0],
-                                    [0,0,GL.t_scale[2],0],
-                                    [0,0,0,1]])
-            trig_p = translate_m@rotate_m@scale_m@trig_p
+            trig_p = GL.getMatrix()@trig_p
             rm = np.transpose(cf.rotate_quat([GL.camRot[:3]],GL.camRot[3])) # rotation
             tm = cf.translationMatrix(-GL.camPos[0],-GL.camPos[1],-GL.camPos[2]) # translation
             view_m = rm@tm # rotation X translation = view
             aux_m = GL.pm@view_m@trig_p # perspective X rotation X translation X points
             NDC_m = aux_m/aux_m[3][0] # NDC
             screen_m = cf.NDCToScreenMatrix(GL.width,GL.height)@NDC_m
-            print(scale_m)
-
-
             GL.triangleSet2D([screen_m[0][0],screen_m[1][0],
                               screen_m[0][1],screen_m[1][1],
                               screen_m[0][2],screen_m[1][2]],colors)
@@ -332,6 +342,14 @@ class GL:
             GL.t_rotation = rotation
             #print("rotation = {0} ".format(GL.t_rotation), end='') # imprime no terminal
         #print("")
+        translate_m =  cf.translationMatrix(GL.t_translation[0],GL.t_translation[1],GL.t_translation[2])
+        rotate_m = cf.rotate_quat([GL.t_rotation[:3]],GL.t_rotation[3])
+        scale_m = np.array([[GL.t_scale[0],0,0,0],
+                                [0,GL.t_scale[1],0,0],
+                                [0,0,GL.t_scale[2],0],
+                                [0,0,0,1]])
+        t_transform = translate_m@rotate_m@scale_m
+        GL.pushMatrix(t_transform)
 
     @staticmethod
     def transform_out():
@@ -340,7 +358,7 @@ class GL:
         # grafo de cena. Não são passados valores, porém quando se sai de um nó transform se
         # deverá recuperar a matriz de transformação dos modelos do mundo da estrutura de
         # pilha implementada.
-
+        GL.popMatrix()
         # O print abaixo é só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
         #print("Saindo de Transform")
 
@@ -358,15 +376,11 @@ class GL:
         # depois 2, 3 e 4, e assim por diante. Cuidado com a orientação dos vértices, ou seja,
         # todos no sentido horário ou todos no sentido anti-horário, conforme especificado.
 
-        # O print abaixo é só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
-        print("TriangleStripSet : pontos = {0} ".format(point), end='')
-        for i, strip in enumerate(stripCount):
-            print("strip[{0}] = {1} ".format(i, strip), end='')
-        print("")
-        print("TriangleStripSet : colors = {0}".format(colors)) # imprime no terminal as cores
+        emissive = colors["emissiveColor"]
+        emissive = [int(i*255) for i in emissive]
 
-        # Exemplo de desenho de um pixel branco na coordenada 10, 10
-        gpu.GPU.draw_pixel([10, 10], gpu.GPU.RGB8, [255, 255, 255])  # altera pixel
+        for strip in stripCount:
+            pass
 
     @staticmethod
     def indexedTriangleStripSet(point, index, colors):
