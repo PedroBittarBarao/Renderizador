@@ -79,7 +79,7 @@ def dentro(p0,p1,p2,p):
     return l0 and l1 and l2
 
 
-def rotate_quat(u,theta):
+def rotate_quat(rotation):
     """ 
     Rotate a point using a quaternion rotation.
     Parameters:
@@ -92,10 +92,11 @@ def rotate_quat(u,theta):
     theta = angle
     """
 
-    qi = u[0][0]*np.sin(theta/2)
-    qj = u[0][1]*np.sin(theta/2)
-    qk = u[0][2]*np.sin(theta/2)
-    qr = np.cos(theta/2)
+
+    qi = rotation[0]*np.sin(rotation[3]/2)
+    qj = rotation[1]*np.sin(rotation[3]/2)
+    qk = rotation[2]*np.sin(rotation[3]/2)
+    qr = np.cos(rotation[3]/2)
 
     rm = [[1-2*(qj**2+qk**2),2*(qi*qj - qk*qr)   , 2*(qi*qk + qj*qr)     ,0],
           [2*(qi*qj + qk*qr),1-2*(qi**2 + qk**2) , 2*(qj*qk - qi*qr)     ,0],
