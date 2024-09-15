@@ -197,6 +197,11 @@ class GL:
             x2 = vertices[6*i+4]
             y2 = vertices[6*i+5]
 
+            area = cf.area([x0,y0],[x1,y1],[x2,y2]) # signed area
+            if area>0: # clockwise
+                x0,y0,x1,y1,x2,y2 = x1,y1,x0,y0,x2,y2 # swap points
+                area = -area # invert area
+
             #print("COORDS",x0,y0,x1,y1,x2,y2)
 
             min_x = math.floor(min(x0,x1,x2))
@@ -364,6 +369,7 @@ class GL:
                 vertices.append(point[i+u])
 
         GL.triangleSet(vertices,colors)
+        
 
     @staticmethod
     def indexedTriangleStripSet(point, index, colors):
@@ -381,14 +387,10 @@ class GL:
                 i += 1 # pulando indices -1
                 continue
 
-            if i%2==0:
-                appendVertices(point, vertices, index[i])     # Vertex 1
-                appendVertices(point, vertices, index[i + 1]) # Vertex 2
-                appendVertices(point, vertices, index[i + 2]) # Vertex 3
-            else:
-                appendVertices(point, vertices, index[i])     # Vertex 1
-                appendVertices(point, vertices, index[i + 2]) # Vertex 3
-                appendVertices(point, vertices, index[i + 1]) # Vertex 2
+
+            appendVertices(point, vertices, index[i])     # Vertex 1
+            appendVertices(point, vertices, index[i + 1]) # Vertex 2
+            appendVertices(point, vertices, index[i + 2]) # Vertex 3
 
             i += 1 
 

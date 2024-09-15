@@ -137,3 +137,21 @@ def translation_matrix(x,y,z):
                      [0,1,0,y],
                      [0,0,1,z],
                      [0,0,0,1]])
+
+def area(p0,p1,p2):
+    """
+    Calculates the signed area of a triangle defined by three points.
+
+    Parameters:
+    - p0: The first point of the triangle.
+    - p1: The second point of the triangle.
+    - p2: The third point of the triangle.
+
+    Returns:
+    - float: The area of the triangle.
+    """
+    x1,y1 = p0
+    x2,y2 = p1
+    x3,y3 = p2
+    return 0.5*(x1*(y2-y3)+x2*(y3-y1)+x3*(y1-y2))
+
