@@ -240,15 +240,9 @@ class GL:
         emissive = [int(i*255) for i in emissive]
         n_trigs = int(len(point)/9)
         for t in range(n_trigs):
-            x1 = point[9*t]
-            y1 = point[9*t+1]
-            z1 = point[9*t+2]
-            x2 = point[9*t+3]
-            y2 = point[9*t+4]
-            z2 = point[9*t+5]
-            x3 = point[9*t+6]
-            y3 = point[9*t+7]
-            z3 = point[9*t+8]
+            x1, y1, z1 = point[9*t:9*t+3]
+            x2, y2, z2 = point[9*t+3:9*t+6]
+            x3, y3, z3 = point[9*t+6:9*t+9]
             trig_p = np.array([[x1,x2,x3],[y1,y2,y3],[z1,z2,z3],[1,1,1]])
             trig_p = GL.getMatrix()@trig_p
 
@@ -256,10 +250,10 @@ class GL:
             aux_m = GL.pm@trig_p # perspective X rotation X translation X points
             NDC_m = aux_m/aux_m[3][0] # NDC
             screen_m = cf.NDC_to_screen_matrix(GL.width,GL.height)@NDC_m
-            screen_m = screen_m[:2].transpose().flatten()
-            GL.triangleSet2D([screen_m[0,0],screen_m[0,1],
-                              screen_m[0,2],screen_m[0,3],
-                              screen_m[0,4],screen_m[0,5]],colors)
+            screen_m = np.array(screen_m)
+            GL.triangleSet2D([screen_m[0][0],screen_m[1][0],
+                                screen_m[0][1],screen_m[1][1],
+                                screen_m[0][2],screen_m[1][2]],colors)
             
             
 
@@ -374,28 +368,28 @@ class GL:
     @staticmethod
     def indexedTriangleStripSet(point, index, colors):
         """Função usada para renderizar IndexedTriangleStripSet."""
-
-        def appendVertices(points, vertices, idx):
-            coord = idx * 3
-            for u in range(3): 
-                vertices.append(points[coord + u])
-
+        
         vertices = []
-        i = 0
-        while i < len(index) - 2:
+        num_indices = len(index)
+
+        for i in range(num_indices - 2):
             if index[i] == -1 or index[i + 1] == -1 or index[i + 2] == -1:
-                i += 1 # pulando indices -1
                 continue
+            
+            # Pre-calculate the coordinates for each index only once
+            coord1 = index[i] * 3
+            coord2 = index[i + 1] * 3
+            coord3 = index[i + 2] * 3
 
+            # Extend vertices list directly with all coordinates
+            vertices.extend(point[coord1:coord1 + 3])  # Vertex 1
+            vertices.extend(point[coord2:coord2 + 3])  # Vertex 2
+            vertices.extend(point[coord3:coord3 + 3])  # Vertex 3
 
-            appendVertices(point, vertices, index[i])     # Vertex 1
-            appendVertices(point, vertices, index[i + 1]) # Vertex 2
-            appendVertices(point, vertices, index[i + 2]) # Vertex 3
-
-            i += 1 
-
-        #print(vertices)
+        # Now pass the collected vertices to the rendering function
         GL.triangleSet(vertices, colors)
+
+
 
     @staticmethod
     def box(size, colors):
@@ -438,19 +432,19 @@ class GL:
         # implementadado um método para a leitura de imagens.
 
         # Os prints abaixo são só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
-        print("IndexedFaceSet : ")
-        if coord:
-            print("\tpontos(x, y, z) = {0}, coordIndex = {1}".format(coord, coordIndex))
-        print("colorPerVertex = {0}".format(colorPerVertex))
-        if colorPerVertex and color and colorIndex:
-            print("\tcores(r, g, b) = {0}, colorIndex = {1}".format(color, colorIndex))
-        if texCoord and texCoordIndex:
-            print("\tpontos(u, v) = {0}, texCoordIndex = {1}".format(texCoord, texCoordIndex))
-        if current_texture:
-            image = gpu.GPU.load_texture(current_texture[0])
-            print("\t Matriz com image = {0}".format(image))
-            print("\t Dimensões da image = {0}".format(image.shape))
-        print("IndexedFaceSet : colors = {0}".format(colors))  # imprime no terminal as cores
+        #print("IndexedFaceSet : ")
+        #if coord:
+        #    print("\tpontos(x, y, z) = {0}, coordIndex = {1}".format(coord, coordIndex))
+        #print("colorPerVertex = {0}".format(colorPerVertex))
+        #if colorPerVertex and color and colorIndex:
+        #    print("\tcores(r, g, b) = {0}, colorIndex = {1}".format(color, colorIndex))
+        #if texCoord and texCoordIndex:
+        #    print("\tpontos(u, v) = {0}, texCoordIndex = {1}".format(texCoord, texCoordIndex))
+        #if current_texture:
+        #    image = gpu.GPU.load_texture(current_texture[0])
+        #    print("\t Matriz com image = {0}".format(image))
+        #    print("\t Dimensões da image = {0}".format(image.shape))
+        #print("IndexedFaceSet : colors = {0}".format(colors))  # imprime no terminal as cores
 
         if current_texture:
             pass
