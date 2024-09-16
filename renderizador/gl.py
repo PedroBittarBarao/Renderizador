@@ -199,45 +199,42 @@ class GL:
     @staticmethod
     def triangleSet2D(vertices, colors):
         """Função usada para renderizar TriangleSet2D."""
-        # Nessa função você receberá os vertices de um triângulo no parâmetro vertices,
-        # esses pontos são uma lista de pontos x, y sempre na ordem. Assim point[0] é o
-        # valor da coordenada x do primeiro ponto, point[1] o valor y do primeiro ponto.
-        # Já point[2] é a coordenada x do segundo ponto e assim por diante. Assuma que a
-        # quantidade de pontos é sempre multiplo de 3, ou seja, 6 valores ou 12 valores, etc.
-        # O parâmetro colors é um dicionário com os tipos cores possíveis, para o TriangleSet2D
-        # você pode assumir inicialmente o desenho das linhas com a cor emissiva (emissiveColor).
-        # print("TriangleSet2D : vertices = {0}".format(vertices)) # imprime no terminal
-        # print("TriangleSet2D : colors = {0}".format(colors)) # imprime no terminal as cores
 
+        # Get the emissive color, convert to 8-bit RGB
         emissive = colors["emissiveColor"]
         emissive = [int(i * 255) for i in emissive]
 
+        # Number of triangles to process
         n_trigs = int(len(vertices) / 6)
+
+        # Iterate over each triangle
         for i in range(n_trigs):
-            x0 = vertices[6 * i]
-            y0 = vertices[6 * i + 1]
-            x1 = vertices[6 * i + 2]
-            y1 = vertices[6 * i + 3]
-            x2 = vertices[6 * i + 4]
-            y2 = vertices[6 * i + 5]
+            # Extract triangle vertices
+            x0, y0 = vertices[6 * i], vertices[6 * i + 1]
+            x1, y1 = vertices[6 * i + 2], vertices[6 * i + 3]
+            x2, y2 = vertices[6 * i + 4], vertices[6 * i + 5]
 
-            area = cf.area([x0, y0], [x1, y1], [x2, y2])  # signed area
-            if area > 0:  # clockwise
-                x0, y0, x1, y1, x2, y2 = x1, y1, x0, y0, x2, y2  # swap points
-                area = -area  # invert area
+            # Calculate the signed area of the triangle
+            area = cf.area([x0, y0], [x1, y1], [x2, y2])
 
-            # print("COORDS",x0,y0,x1,y1,x2,y2)
+            # If the triangle is in clockwise order, swap vertices to make it counterclockwise
+            if area > 0:
+                x0, y0, x1, y1 = x1, y1, x0, y0  # Swap vertices to ensure counterclockwise order
 
-            min_x = math.floor(min(x0, x1, x2))
-            max_x = math.ceil(max(x0, x1, x2))
-            min_y = math.floor(min(y0, y1, y2))
-            max_y = math.ceil(max(y0, y1, y2))
+            # Pre-calculate bounding box of the triangle
+            min_x = max(0, math.floor(min(x0, x1, x2)))
+            max_x = min(GL.width - 1, math.ceil(max(x0, x1, x2)))
+            min_y = max(0, math.floor(min(y0, y1, y2)))
+            max_y = min(GL.height - 1, math.ceil(max(y0, y1, y2)))
 
+            # Loop over the bounding box only
             for x in range(min_x, max_x + 1):
                 for y in range(min_y, max_y + 1):
-                    inside = cf.dentro([x0, y0], [x1, y1], [x2, y2], [x + 0.5, y + 0.5])
-                    if inside and x >= 0 and y >= 0 and x < GL.width and y < GL.height:
+                    # Check if the pixel center (x+0.5, y+0.5) is inside the triangle
+                    if cf.dentro([x0, y0], [x1, y1], [x2, y2], [x + 0.5, y + 0.5]):
+                        # Draw the pixel if inside the triangle
                         gpu.GPU.draw_pixel([x, y], gpu.GPU.RGB8, emissive)
+
 
     @staticmethod
     def triangleSet(point, colors):
@@ -258,6 +255,8 @@ class GL:
         emissive = colors["emissiveColor"]
         emissive = [int(i * 255) for i in emissive]
         n_trigs = int(len(point) / 9)
+        tranform_m = GL.getMatrix()
+        cam_to_screen = cf.NDC_to_screen_matrix(GL.width, GL.height)
         for t in range(n_trigs):
             x1, y1, z1 = point[9 * t : 9 * t + 3]
             x2, y2, z2 = point[9 * t + 3 : 9 * t + 6]
@@ -266,12 +265,10 @@ class GL:
                                [y1, y2, y3],
                                [z1, z2, z3],
                                [1 , 1 , 1 ]])
-            trig_p = GL.getMatrix() @ trig_p
-
-            # print(GL.pm)
+            trig_p = tranform_m @ trig_p
             aux_m = GL.pm @ trig_p  # perspective X rotation X translation X points
             NDC_m = aux_m / aux_m[3][0]  # NDC
-            screen_m = cf.NDC_to_screen_matrix(GL.width, GL.height) @ NDC_m
+            screen_m = cam_to_screen @ NDC_m
             screen_m = np.array(screen_m)
             GL.triangleSet2D(
                 [
@@ -392,12 +389,23 @@ class GL:
     @staticmethod
     def triangleStripSet(point, stripCount, colors):
         """Função usada para renderizar TriangleStripSet."""
-        vertices = []
-        for i in range(0, len(point) - 6, 3):  #
-            for u in range(0, 9):  # appending each vertex, 3 vertices
-                vertices.append(point[i + u])
 
+        # Initialize the list to store all the vertices for the triangle strips
+        vertices = []
+        offset = 0  # To keep track of the starting point of each strip
+
+        for count in stripCount:
+            # Process each strip based on its count
+            for i in range(count - 2):  # Each triangle in the strip reuses 2 points from the previous one
+                # Append the vertices for each triangle in the strip
+                vertices.extend(point[offset + i * 3: offset + i * 3 + 9])
+
+            # Move the offset to the next strip
+            offset += count * 3
+
+        # Call the triangle rendering function with the prepared vertices
         GL.triangleSet(vertices, colors)
+
 
     @staticmethod
     def indexedTriangleStripSet(point, index, colors):
