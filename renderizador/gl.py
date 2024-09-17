@@ -38,6 +38,7 @@ class GL:
                               [0, 1, 0, 0],
                               [0, 0, 1, 0],
                               [0, 0, 0, 1]])]
+        GL.super_buffer = np.zeros((GL.width*2, GL.height*2, 3))
 
     @staticmethod
     def pushMatrix(matrix):
@@ -220,20 +221,40 @@ class GL:
             # If the triangle is in clockwise order, swap vertices to make it counterclockwise
             if area > 0:
                 x0, y0, x1, y1 = x1, y1, x0, y0  # Swap vertices to ensure counterclockwise order
+            
+            super_x0 = x0*2
+            super_y0 = y0*2
+            super_x1 = x1*2
+            super_y1 = y1*2
+            super_x2 = x2*2
+            super_y2 = y2*2
 
             # Pre-calculate bounding box of the triangle
+            super_min_x = max(0, math.floor(min(super_x0, super_x1, super_x2)))
+            super_max_x = min(GL.width*2 - 1, math.ceil(max(super_x0, super_x1, super_x2)))
+            super_min_y = max(0, math.floor(min(super_y0, super_y1, super_y2)))
+            super_max_y = min(GL.height*2 - 1, math.ceil(max(super_y0, super_y1, super_y2)))
+
             min_x = max(0, math.floor(min(x0, x1, x2)))
             max_x = min(GL.width - 1, math.ceil(max(x0, x1, x2)))
             min_y = max(0, math.floor(min(y0, y1, y2)))
             max_y = min(GL.height - 1, math.ceil(max(y0, y1, y2)))
 
             # Loop over the bounding box only
+            for x in range(super_min_x, super_max_x + 1):
+                for y in range(super_min_y, super_max_y + 1):
+                    # Check if the pixel center (x+0.5, y+0.5) is inside the triangle
+                    if cf.dentro([super_x0, super_y0], [super_x1, super_y1], [super_x2, super_y2], [x + 0.5, y + 0.5]):
+                        # Draw the pixel if inside the triangle
+                        GL.super_buffer[x, y] = emissive
+            
             for x in range(min_x, max_x + 1):
                 for y in range(min_y, max_y + 1):
-                    # Check if the pixel center (x+0.5, y+0.5) is inside the triangle
-                    if cf.dentro([x0, y0], [x1, y1], [x2, y2], [x + 0.5, y + 0.5]):
-                        # Draw the pixel if inside the triangle
-                        gpu.GPU.draw_pixel([x, y], gpu.GPU.RGB8, emissive)
+                        p0 = GL.super_buffer[x*2 - 1, y*2]
+                        p1 = GL.super_buffer[x*2, y*2]
+                        p2 = GL.super_buffer[x*2 - 1, y*2 + 1]
+                        p3 = GL.super_buffer[x*2, y*2 + 1]
+                        gpu.GPU.draw_pixel([x, y], gpu.GPU.RGB8, (p0 + p1 + p2 + p3) / 4)
 
 
     @staticmethod
