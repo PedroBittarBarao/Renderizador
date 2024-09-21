@@ -198,12 +198,13 @@ class GL:
         print("Circle2D : colors = {0}".format(colors))  # imprime no terminal as cores
 
     @staticmethod
-    def triangleSet2D(vertices, colors):
+    def triangleSet2D(vertices, colors, colorPerVertex = False,vertexColors = None ,zs = None):
         """Função usada para renderizar TriangleSet2D."""
 
         # Get the emissive color, convert to 8-bit RGB
         emissive = colors["emissiveColor"]
         emissive = [int(i * 255) for i in emissive]
+    
 
         # Number of triangles to process
         n_trigs = int(len(vertices) / 6)
@@ -214,7 +215,8 @@ class GL:
             x0, y0 = vertices[6 * i], vertices[6 * i + 1]
             x1, y1 = vertices[6 * i + 2], vertices[6 * i + 3]
             x2, y2 = vertices[6 * i + 4], vertices[6 * i + 5]
-
+            """ if colorPerVertex:
+                print(vertexColors) """
             # Calculate the signed area of the triangle
             area = cf.area([x0, y0], [x1, y1], [x2, y2])
 
@@ -245,8 +247,24 @@ class GL:
                 for y in range(super_min_y, super_max_y + 1):
                     # Check if the pixel center (x+0.5, y+0.5) is inside the triangle
                     if cf.dentro([super_x0, super_y0], [super_x1, super_y1], [super_x2, super_y2], [x + 0.5, y + 0.5]):
-                        # Draw the pixel if inside the triangle
-                        GL.super_buffer[x, y] = emissive
+                        if colorPerVertex:
+                            a_total = cf.area([super_x0, super_y0], [super_x1, super_y1], [super_x2, super_y2])
+                            a0 = cf.area([super_x1, super_y1], [super_x2, super_y2], [x, y])
+                            a1 = cf.area([super_x2, super_y2], [super_x0, super_y0], [x, y])
+                            a2 = cf.area([super_x0, super_y0], [super_x1, super_y1], [x, y])
+                            alpha = abs(a0 / a_total)
+                            beta = abs(a1 / a_total)
+                            gamma = abs(a2 / a_total)
+                            r = vertexColors[3*i][0] * alpha + vertexColors[3*i+1][0] * beta + vertexColors[3*i+2][0] * gamma
+                            g = vertexColors[3*i][1] * alpha + vertexColors[3*i+1][1] * beta + vertexColors[3*i+2][1] * gamma
+                            b = vertexColors[3*i][2] * alpha + vertexColors[3*i+1][2] * beta + vertexColors[3*i+2][2] * gamma
+                            z = 1/(alpha*(1/zs[0]) + beta*(1/zs[1]) + gamma*(1/zs[2]))
+                            cr = z * r/zs[0]
+                            cg = z * g/zs[1]
+                            cb = z * b/zs[2]
+                            GL.super_buffer[x, y] = [int(cr), int(cg), int(cb)]
+                        else:
+                            GL.super_buffer[x, y] = emissive
             
             for x in range(min_x, max_x + 1):
                 for y in range(min_y, max_y + 1):
@@ -258,7 +276,7 @@ class GL:
 
 
     @staticmethod
-    def triangleSet(point, colors):
+    def triangleSet(point, colors,colorPerVertex = False,vertexColors = None):
         """Função usada para renderizar TriangleSet."""
         # Nessa função você receberá pontos no parâmetro point, esses pontos são uma lista
         # de pontos x, y, e z sempre na ordem. Assim point[0] é o valor da coordenada x do
@@ -273,8 +291,6 @@ class GL:
         # (emissiveColor), conforme implementar novos materias você deverá suportar outros
         # tipos de cores.
 
-        emissive = colors["emissiveColor"]
-        emissive = [int(i * 255) for i in emissive]
         n_trigs = int(len(point) / 9)
         tranform_m = GL.getMatrix()
         cam_to_screen = cf.NDC_to_screen_matrix(GL.width, GL.height)
@@ -287,6 +303,7 @@ class GL:
                                [z1, z2, z3],
                                [1 , 1 , 1 ]])
             trig_p = tranform_m @ trig_p
+            zs = (GL.look_at@trig_p)[2]
             aux_m = GL.pm @ trig_p  # perspective X rotation X translation X points
             NDC_m = aux_m / aux_m[3][0]  # NDC
             screen_m = cam_to_screen @ NDC_m
@@ -298,6 +315,9 @@ class GL:
                     screen_m[0][2],screen_m[1][2],
                 ],
                 colors,
+                colorPerVertex,
+                vertexColors[3*t:3*t+3] if colorPerVertex else None,
+                np.array(zs)[0]
             )
 
     @staticmethod
@@ -330,6 +350,7 @@ class GL:
         look_at_trans = np.linalg.inv(cam_pos)
         look_at_rot = np.linalg.inv(rotation_m)
         look_at_mat = look_at_rot @ look_at_trans
+        GL.look_at = look_at_mat
 
         perspective_m = np.array(
             [[GL.near / right, 0, 0, 0],
@@ -429,10 +450,11 @@ class GL:
 
 
     @staticmethod
-    def indexedTriangleStripSet(point, index, colors):
+    def indexedTriangleStripSet(point, index, colors, colorPerVertex=False, vertexColors=None,colorIndex=None):
         """Função usada para renderizar IndexedTriangleStripSet."""
-
+        
         vertices = []
+        color_values = []  # Will store colors for each vertex if colorPerVertex is True
         num_indices = len(index)
 
         for i in range(num_indices - 2):
@@ -448,9 +470,25 @@ class GL:
             vertices.extend(point[coord1 : coord1 + 3])  # Vertex 1
             vertices.extend(point[coord2 : coord2 + 3])  # Vertex 2
             vertices.extend(point[coord3 : coord3 + 3])  # Vertex 3
+            # If colorPerVertex is enabled, collect colors for these vertices
 
-        # Now pass the collected vertices to the rendering function
-        GL.triangleSet(vertices, colors)
+            if colorPerVertex:
+                color1 = colorIndex[i] * 3
+                color2 = colorIndex[i + 1] * 3
+                color3 = colorIndex[i + 2] * 3
+                """ print(vertexColors)
+                print(f"color1 {vertexColors[color1:color1 + 3]} {color1}")
+                print(f"color2 {vertexColors[color2:color2 + 3]} {color2}")
+                print(f"color3 {vertexColors[color3:color3 + 3]} {color3}") """
+                color_values.extend(vertexColors[color1 : color1 + 3])  # Color 1
+                color_values.extend(vertexColors[color2 : color2 + 3])  # Color 2
+                color_values.extend(vertexColors[color3 : color3 + 3])  # Color 3
+
+
+
+        # Now pass the collected vertices and colors to the rendering function
+        GL.triangleSet(vertices, colors, colorPerVertex, vertexColors=color_values if colorPerVertex else None)
+
 
     @staticmethod
     def box(size, colors):
@@ -488,42 +526,59 @@ class GL:
             image = gpu.GPU.load_texture(current_texture[0])
             # Apply texture logic here (omitted for now)
 
+        vertex_colors = None  # Will store per-vertex colors if needed
+        
+
         # Handle case when colors are provided per vertex
-        elif colorPerVertex and color and colorIndex:
-            # Apply color-per-vertex logic here (omitted for now)
-            pass
+        if colorPerVertex and color and colorIndex:
+            # If we have per-vertex colors, create a list of vertex colors
+            vertex_colors = []
+            for idx in colorIndex:
+                if idx != -1:
+                    # Since color is a flat list, extract RGB values as a triplet
+                    start = idx * 3  # Each color is represented by 3 consecutive floats
+                    rgb = color[start:start + 3]
+                    
+                    
+                    # Convert each component from 0-1 float to 0-255 integer
+                    vertex_colors.append([int(c * 255) for c in rgb])
+                    
 
         # General case without texture and colors per vertex
-        else:
-            # First step: parse coordIndex into faces (groups of vertices)
-            faces = []
-            vertices = []
+        
+        # First step: parse coordIndex into faces (groups of vertices)
+        faces = []
+        vertices = []
+        
+        # Collect the faces based on -1 delimiters
+        for i in coordIndex:
+            if i == -1:
+                if vertices:  # If there are vertices collected, add as a face
+                    faces.append(vertices)
+                vertices = []  # Reset for the next face
+            else:
+                vertices.append(i)
+
+        # Initialize strips for triangle strip set
+        strips = []
+
+        # Convert each face into a triangle strip
+        for face in faces:
+            if len(face) < 3:
+                continue  # Skip faces with fewer than 3 vertices
             
-            # Collect the faces based on -1 delimiters
-            for i in coordIndex:
-                if i == -1:
-                    if vertices:  # If there are vertices collected, add as a face
-                        faces.append(vertices)
-                    vertices = []  # Reset for the next face
-                else:
-                    vertices.append(i)
+            # Add triangles in a fan-like pattern from the first vertex
+            strips.extend([face[0], face[i], face[i + 1], -1] for i in range(1, len(face) - 1))
 
-            # Initialize strips for triangle strip set
-            strips = []
+        # Flatten the list of strips
+        strips_flat = [item for sublist in strips for item in sublist]
 
-            # Convert each face into a triangle strip
-            for face in faces:
-                if len(face) < 3:
-                    continue  # Skip faces with fewer than 3 vertices
-                
-                # Add triangles in a fan-like pattern from the first vertex
-                strips.extend([face[0], face[i], face[i + 1], -1] for i in range(1, len(face) - 1))
+        # Call the triangle strip rendering function
+        
+        GL.indexedTriangleStripSet(coord, strips_flat,colors,colorPerVertex, vertex_colors if vertex_colors else colors,colorIndex)
 
-            # Flatten the list of strips
-            strips_flat = [item for sublist in strips for item in sublist]
 
-            # Call the triangle strip rendering function
-            GL.indexedTriangleStripSet(coord, strips_flat, colors)
+
 
 
     @staticmethod
