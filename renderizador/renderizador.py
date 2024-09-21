@@ -112,6 +112,7 @@ class Renderizador:
         # Essa é uma chamada conveniente para manipulação de buffers
         # ao final da renderização de um frame. Como por exemplo, executar
         # downscaling da imagem.
+
         # Método para a troca dos buffers (NÃO IMPLEMENTADO)
         # Esse método será utilizado na fase de implementação de animações
         gpu.GPU.swap_buffers()
