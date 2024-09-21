@@ -489,6 +489,62 @@ class GL:
         # Now pass the collected vertices and colors to the rendering function
         GL.triangleSet(vertices, colors, colorPerVertex, vertexColors=color_values if colorPerVertex else None)
 
+        # https://www.web3d.org/specifications/X3Dv4/ISO-IEC19775-1v4-IS/Part01/components/rendering.html#IndexedTriangleStripSet
+        # A função indexedTriangleStripSet é usada para desenhar tiras de triângulos
+        # interconectados, você receberá as coordenadas dos pontos no parâmetro point, esses
+        # pontos são uma lista de pontos x, y, e z sempre na ordem. Assim point[0] é o valor
+        # da coordenada x do primeiro ponto, point[1] o valor y do primeiro ponto, point[2]
+        # o valor z da coordenada z do primeiro ponto. Já point[3] é a coordenada x do
+        # segundo ponto e assim por diante. No IndexedTriangleStripSet uma lista informando
+        # como conectar os vértices é informada em index, o valor -1 indica que a lista
+        # acabou. A ordem de conexão será de 3 em 3 pulando um índice. Por exemplo: o
+        # primeiro triângulo será com os vértices 0, 1 e 2, depois serão os vértices 1, 2 e 3,
+        # depois 2, 3 e 4, e assim por diante. Cuidado com a orientação dos vértices, ou seja,
+        # todos no sentido horário ou todos no sentido anti-horário, conforme especificado.
+
+
+
+    @staticmethod
+    def indexedFaceSet(coord, coordIndex, colorPerVertex, color, colorIndex,
+                       texCoord, texCoordIndex, colors, current_texture):
+        """Função usada para renderizar IndexedFaceSet."""
+        # https://www.web3d.org/specifications/X3Dv4/ISO-IEC19775-1v4-IS/Part01/components/geometry3D.html#IndexedFaceSet
+        # A função indexedFaceSet é usada para desenhar malhas de triângulos. Ela funciona de
+        # forma muito simular a IndexedTriangleStripSet porém com mais recursos.
+        # Você receberá as coordenadas dos pontos no parâmetro cord, esses
+        # pontos são uma lista de pontos x, y, e z sempre na ordem. Assim coord[0] é o valor
+        # da coordenada x do primeiro ponto, coord[1] o valor y do primeiro ponto, coord[2]
+        # o valor z da coordenada z do primeiro ponto. Já coord[3] é a coordenada x do
+        # segundo ponto e assim por diante. No IndexedFaceSet uma lista de vértices é informada
+        # em coordIndex, o valor -1 indica que a lista acabou.
+        # A ordem de conexão não possui uma ordem oficial, mas em geral se o primeiro ponto com os dois
+        # seguintes e depois este mesmo primeiro ponto com o terçeiro e quarto ponto. Por exemplo: numa
+        # sequencia 0, 1, 2, 3, 4, -1 o primeiro triângulo será com os vértices 0, 1 e 2, depois serão
+        # os vértices 0, 2 e 3, e depois 0, 3 e 4, e assim por diante, até chegar no final da lista.
+        # Adicionalmente essa implementação do IndexedFace aceita cores por vértices, assim
+        # se a flag colorPerVertex estiver habilitada, os vértices também possuirão cores
+        # que servem para definir a cor interna dos poligonos, para isso faça um cálculo
+        # baricêntrico de que cor deverá ter aquela posição. Da mesma forma se pode definir uma
+        # textura para o poligono, para isso, use as coordenadas de textura e depois aplique a
+        # cor da textura conforme a posição do mapeamento. Dentro da classe GPU já está
+        # implementadado um método para a leitura de imagens.
+
+        # Os prints abaixo são só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
+        print("IndexedFaceSet : ")
+        if coord:
+            print("\tpontos(x, y, z) = {0}, coordIndex = {1}".format(coord, coordIndex))
+        print("colorPerVertex = {0}".format(colorPerVertex))
+        if colorPerVertex and color and colorIndex:
+            print("\tcores(r, g, b) = {0}, colorIndex = {1}".format(color, colorIndex))
+        if texCoord and texCoordIndex:
+            print("\tpontos(u, v) = {0}, texCoordIndex = {1}".format(texCoord, texCoordIndex))
+        if current_texture:
+            image = gpu.GPU.load_texture(current_texture[0])
+            print("\t Matriz com image = {0}".format(image))
+            print("\t Dimensões da image = {0}".format(image.shape))
+        print("IndexedFaceSet : colors = {0}".format(colors))  # imprime no terminal as cores
+
+
 
     @staticmethod
     def box(size, colors):
@@ -504,8 +560,7 @@ class GL:
         print("Box : size = {0}".format(size))  # imprime no terminal pontos
         print("Box : colors = {0}".format(colors))  # imprime no terminal as cores
 
-        # Exemplo de desenho de um pixel branco na coordenada 10, 10
-        gpu.GPU.draw_pixel([10, 10], gpu.GPU.RGB8, [255, 255, 255])  # altera pixel
+    
 
     @staticmethod
     def indexedFaceSet(
@@ -591,10 +646,40 @@ class GL:
         # os triângulos.
 
         # O print abaixo é só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
-        print(
-            "Sphere : radius = {0}".format(radius)
-        )  # imprime no terminal o raio da esfera
-        print("Sphere : colors = {0}".format(colors))  # imprime no terminal as cores
+        print("Sphere : radius = {0}".format(radius)) # imprime no terminal o raio da esfera
+        print("Sphere : colors = {0}".format(colors)) # imprime no terminal as cores
+
+    @staticmethod
+    def cone(bottomRadius, height, colors):
+        """Função usada para renderizar Cones."""
+        # https://www.web3d.org/specifications/X3Dv4/ISO-IEC19775-1v4-IS/Part01/components/geometry3D.html#Cone
+        # A função cone é usada para desenhar cones na cena. O cone é centrado no
+        # (0, 0, 0) no sistema de coordenadas local. O argumento bottomRadius especifica o
+        # raio da base do cone e o argumento height especifica a altura do cone.
+        # O cone é alinhado com o eixo Y local. O cone é fechado por padrão na base.
+        # Para desenha esse cone você vai precisar tesselar ele em triângulos, para isso
+        # encontre os vértices e defina os triângulos.
+
+        # O print abaixo é só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
+        print("Cone : bottomRadius = {0}".format(bottomRadius)) # imprime no terminal o raio da base do cone
+        print("Cone : height = {0}".format(height)) # imprime no terminal a altura do cone
+        print("Cone : colors = {0}".format(colors)) # imprime no terminal as cores
+
+    @staticmethod
+    def cylinder(radius, height, colors):
+        """Função usada para renderizar Cilindros."""
+        # https://www.web3d.org/specifications/X3Dv4/ISO-IEC19775-1v4-IS/Part01/components/geometry3D.html#Cylinder
+        # A função cylinder é usada para desenhar cilindros na cena. O cilindro é centrado no
+        # (0, 0, 0) no sistema de coordenadas local. O argumento radius especifica o
+        # raio da base do cilindro e o argumento height especifica a altura do cilindro.
+        # O cilindro é alinhado com o eixo Y local. O cilindro é fechado por padrão em ambas as extremidades.
+        # Para desenha esse cilindro você vai precisar tesselar ele em triângulos, para isso
+        # encontre os vértices e defina os triângulos.
+
+        # O print abaixo é só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
+        print("Cylinder : radius = {0}".format(radius)) # imprime no terminal o raio do cilindro
+        print("Cylinder : height = {0}".format(height)) # imprime no terminal a altura do cilindro
+        print("Cylinder : colors = {0}".format(colors)) # imprime no terminal as cores
 
     @staticmethod
     def navigationInfo(headlight):
