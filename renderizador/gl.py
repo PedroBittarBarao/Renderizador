@@ -40,7 +40,7 @@ class GL:
                               [0, 0, 1, 0],
                               [0, 0, 0, 1]])]
         GL.super_buffer = np.zeros((GL.width*2, GL.height*2, 3))
-        GL.z_buffer = np.inf * np.ones((GL.width*2, GL.height*2))
+        GL.z_buffer = - np.inf * np.ones((GL.width*2, GL.height*2))
 
     @staticmethod
     def pushMatrix(matrix):
@@ -259,7 +259,7 @@ class GL:
                         if zs is not None:
                             z = 1/(alpha/zs[0] + beta/zs[1] + gamma/zs[2])
 
-                            if z < GL.z_buffer[x, y]:
+                            if z > GL.z_buffer[x, y]:
                                 GL.z_buffer[x, y] = z
                             else:
                                 continue # Discard pixel if it is behind another triangle
