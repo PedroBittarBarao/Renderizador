@@ -155,3 +155,58 @@ def area(p0,p1,p2):
     x3,y3 = p2
     return 0.5*(x1*(y2-y3)+x2*(y3-y1)+x3*(y1-y2))
 
+def calculate_barycentric_coordinates(x0, y0, x1, y1, x2, y2, x, y):
+        a_total = area([x0, y0], [x1, y1], [x2, y2])
+        a0 = area([x1, y1], [x2, y2], [x, y])
+        a1 = area([x2, y2], [x0, y0], [x, y])
+        a2 = area([x0, y0], [x1, y1], [x, y])
+        alpha = abs(a0 / a_total)
+        beta = abs(a1 / a_total)
+        gamma = abs(a2 / a_total)
+        return alpha,beta,gamma
+
+def mipmap_level(del_u_del_x,del_u_del_y,del_v_del_x,del_v_del_y):
+    l = max(np.sqrt(del_u_del_x**2 + del_v_del_x**2),np.sqrt(del_u_del_y**2 + del_v_del_y**2))
+    return int(np.log2(l))
+
+""" def generate_mipmap(image : np.array,level):
+    if int(level) == 0 or image.shape[0] == 1 or image.shape[1] == 1:
+        return image
+    else:
+        return generate_mipmap(image[::2,::2],int(level)-1) """
+
+def generate_mipmap(image):
+    """
+    Generates a mipmap pyramid for a given image.
+
+    Parameters:
+    image (numpy.ndarray): Input image as a NumPy array (height, width, channels).
+
+    Returns:
+    mipmap_levels (list): List of mipmap levels where each level is a smaller version of the original image.
+    """
+    mipmap_levels = [image]  # Start with the original image as the first mipmap level
+
+    current_image = image
+    while current_image.shape[0] > 1 and current_image.shape[1] > 1:
+        # Reduce image size by half in both dimensions
+        new_height = max(1, current_image.shape[0] // 2)
+        new_width = max(1, current_image.shape[1] // 2)
+
+        # Downsample by averaging neighboring pixels (bilinear-like filtering)
+        # Take a 2x2 block of pixels and compute their average for each channel
+        reduced_image = np.zeros((new_height, new_width, current_image.shape[2]), dtype=current_image.dtype)
+
+        for y in range(new_height):
+            for x in range(new_width):
+                # Average the 2x2 block of pixels
+                block = current_image[2 * y:2 * y + 2, 2 * x:2 * x + 2]
+                reduced_image[y, x] = np.mean(block, axis=(0, 1))
+
+        # Append the reduced image to the mipmap levels
+        mipmap_levels.append(reduced_image)
+
+        # Update current_image to the newly reduced image for the next iteration
+        current_image = reduced_image
+
+    return mipmap_levels

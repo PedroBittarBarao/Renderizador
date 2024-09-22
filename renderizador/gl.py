@@ -26,6 +26,7 @@ class GL:
     near = 0.5  # plano de corte próximo
     far = 100  # plano de corte distante
     p = None
+    z_buffer = None
 
     @staticmethod
     def setup(width, height, near=0.5, far=100):
@@ -39,6 +40,7 @@ class GL:
                               [0, 0, 1, 0],
                               [0, 0, 0, 1]])]
         GL.super_buffer = np.zeros((GL.width*2, GL.height*2, 3))
+        GL.z_buffer = np.inf * np.ones((GL.width*2, GL.height*2))
 
     @staticmethod
     def pushMatrix(matrix):
@@ -198,13 +200,17 @@ class GL:
         print("Circle2D : colors = {0}".format(colors))  # imprime no terminal as cores
 
     @staticmethod
-    def triangleSet2D(vertices, colors, colorPerVertex = False,vertexColors = None ,zs = None):
+    def triangleSet2D(vertices, colors,
+                    colorPerVertex = False,vertexColors = None ,zs = None,
+                    texture_values = None,image = None):
         """Função usada para renderizar TriangleSet2D."""
+
+        if image is not None:
+            mipmaps = cf.generate_mipmap(image)
 
         # Get the emissive color, convert to 8-bit RGB
         emissive = colors["emissiveColor"]
         emissive = [int(i * 255) for i in emissive]
-    
 
         # Number of triangles to process
         n_trigs = int(len(vertices) / 6)
@@ -215,8 +221,7 @@ class GL:
             x0, y0 = vertices[6 * i], vertices[6 * i + 1]
             x1, y1 = vertices[6 * i + 2], vertices[6 * i + 3]
             x2, y2 = vertices[6 * i + 4], vertices[6 * i + 5]
-            """ if colorPerVertex:
-                print(vertexColors) """
+
             # Calculate the signed area of the triangle
             area = cf.area([x0, y0], [x1, y1], [x2, y2])
 
@@ -247,22 +252,75 @@ class GL:
                 for y in range(super_min_y, super_max_y + 1):
                     # Check if the pixel center (x+0.5, y+0.5) is inside the triangle
                     if cf.dentro([super_x0, super_y0], [super_x1, super_y1], [super_x2, super_y2], [x + 0.5, y + 0.5]):
-                        if colorPerVertex:
-                            a_total = cf.area([super_x0, super_y0], [super_x1, super_y1], [super_x2, super_y2])
-                            a0 = cf.area([super_x1, super_y1], [super_x2, super_y2], [x, y])
-                            a1 = cf.area([super_x2, super_y2], [super_x0, super_y0], [x, y])
-                            a2 = cf.area([super_x0, super_y0], [super_x1, super_y1], [x, y])
-                            alpha = abs(a0 / a_total)
-                            beta = abs(a1 / a_total)
-                            gamma = abs(a2 / a_total)
+                        alpha, beta, gamma = cf.calculate_barycentric_coordinates(super_x0, super_y0,
+                                                                                super_x1, super_y1,
+                                                                                super_x2, super_y2,
+                                                                                x, y)
+                        if zs is not None:
+                            z = 1/(alpha/zs[0] + beta/zs[1] + gamma/zs[2])
+
+                            if z < GL.z_buffer[x, y]:
+                                GL.z_buffer[x, y] = z
+                            else:
+                                continue # Discard pixel if it is behind another triangle
+
+                        if colorPerVertex: # Draw color
                             r = vertexColors[3*i][0] * alpha + vertexColors[3*i+1][0] * beta + vertexColors[3*i+2][0] * gamma
                             g = vertexColors[3*i][1] * alpha + vertexColors[3*i+1][1] * beta + vertexColors[3*i+2][1] * gamma
                             b = vertexColors[3*i][2] * alpha + vertexColors[3*i+1][2] * beta + vertexColors[3*i+2][2] * gamma
-                            z = 1/(alpha*(1/zs[0]) + beta*(1/zs[1]) + gamma*(1/zs[2]))
                             cr = z * r/zs[0]
                             cg = z * g/zs[1]
                             cb = z * b/zs[2]
                             GL.super_buffer[x, y] = [int(cr), int(cg), int(cb)]
+
+                        elif texture_values is not None: # Draw texture
+                            image_shape = image.shape[0]
+                            u0, v0 = texture_values[6*i], texture_values[6*i + 1]
+                            u1, v1 = texture_values[6*i + 2], texture_values[6*i + 3]
+                            u2, v2 = texture_values[6*i + 4], texture_values[6*i + 5]
+                            u = u0 * alpha + u1 * beta + u2 * gamma
+                            v = v0 * alpha + v1 * beta + v2 * gamma
+                            
+                            # u e v vizinhos
+                            alpha_10, beta_10, gamma_10 = cf.calculate_barycentric_coordinates(super_x0, super_y0,
+                                                                                            super_x1, super_y1,
+                                                                                            super_x2, super_y2,
+                                                                                            x + 1, y)
+                            u_10 = u0 * alpha_10 + u1 * beta_10 + u2 * gamma_10
+                            v_10 = v0 * alpha_10 + v1 * beta_10 + v2 * gamma_10
+
+                            alpha_01, beta_01, gamma_01 = cf.calculate_barycentric_coordinates(super_x0, super_y0,   
+                                                                                            super_x1, super_y1,
+                                                                                            super_x2, super_y2,
+                                                                                            x, y + 1)
+                            u_01 = u0 * alpha_01 + u1 * beta_01 + u2 * gamma_01
+                            v_01 = v0 * alpha_01 + v1 * beta_01 + v2 * gamma_01
+
+                            del_u_del_x = image_shape*(u_10 - u)
+                            del_v_del_x = image_shape*(v_10 - v)
+                            del_u_del_y = image_shape*(u_01 - u)
+                            del_v_del_y = image_shape*(v_01 - v)
+                            d = cf.mipmap_level(del_u_del_x,del_u_del_y,del_v_del_x,del_v_del_y)
+
+                            current_mipmap = mipmaps[d]
+                            current_shape = current_mipmap.shape[0]
+                            
+                            u_z0 = u0 / zs[0]
+                            v_z0 = v0 / zs[0]
+                            u_z1 = u1 / zs[1]
+                            v_z1 = v1 / zs[1]
+                            u_z2 = u2 / zs[2]
+                            v_z2 = v2 / zs[2]
+
+                            u_interpolated = (alpha * u_z0 + beta * u_z1 + gamma * u_z2) / (alpha /zs[0] + beta /zs[1] + gamma /zs[2])
+                            v_interpolated = (alpha * v_z0 + beta * v_z1 + gamma * v_z2) / (alpha /zs[0] + beta /zs[1] + gamma /zs[2])
+
+                            flipped_image = np.flip(current_mipmap[:, :, :3],axis=1)
+                            r, g, b = flipped_image[min(255, int(u_interpolated * current_shape)), min(255, int(v_interpolated * current_shape))]
+
+                            GL.super_buffer[x, y] = [min(255,int(r)), min(255,int(g)), min(255,int(b))]
+                            # WRONG PERSPECTIVE
+                    
                         else:
                             GL.super_buffer[x, y] = emissive
             
@@ -272,11 +330,13 @@ class GL:
                         p1 = GL.super_buffer[x*2, y*2]
                         p2 = GL.super_buffer[x*2 - 1, y*2 + 1]
                         p3 = GL.super_buffer[x*2, y*2 + 1]
-                        gpu.GPU.draw_pixel([x, y], gpu.GPU.RGB8, (p0 + p1 + p2 + p3) / 4)
+                        #print(p0,p1,p2,p3)
+                        gpu.GPU.draw_pixel([x, y], gpu.GPU.RGB8, (p0 + p1 + p2 + p3) / 4)    
 
 
     @staticmethod
-    def triangleSet(point, colors,colorPerVertex = False,vertexColors = None):
+    def triangleSet(point, colors,colorPerVertex = False,vertexColors = None,
+                    texture_values = None,image = None):
         """Função usada para renderizar TriangleSet."""
         # Nessa função você receberá pontos no parâmetro point, esses pontos são uma lista
         # de pontos x, y, e z sempre na ordem. Assim point[0] é o valor da coordenada x do
@@ -303,9 +363,9 @@ class GL:
                                [z1, z2, z3],
                                [1 , 1 , 1 ]])
             trig_p = tranform_m @ trig_p
-            zs = (GL.look_at@trig_p)[2]
             aux_m = GL.pm @ trig_p  # perspective X rotation X translation X points
             NDC_m = aux_m / aux_m[3][0]  # NDC
+            zs = (GL.look_at@trig_p)[2]
             screen_m = cam_to_screen @ NDC_m
             screen_m = np.array(screen_m)
             GL.triangleSet2D(
@@ -317,7 +377,9 @@ class GL:
                 colors,
                 colorPerVertex,
                 vertexColors[3*t:3*t+3] if colorPerVertex else None,
-                np.array(zs)[0]
+                np.array(zs)[0],
+                texture_values[6*t:6*t+6] if texture_values is not None else None,
+                image = image
             )
 
     @staticmethod
@@ -450,11 +512,14 @@ class GL:
 
 
     @staticmethod
-    def indexedTriangleStripSet(point, index, colors, colorPerVertex=False, vertexColors=None,colorIndex=None):
+    def indexedTriangleStripSet(point, index, colors,
+                                colorPerVertex=False, vertexColors=None,colorIndex=None,
+                                texCoord=None, texCoordIndex=None, image=None):
         """Função usada para renderizar IndexedTriangleStripSet."""
         
         vertices = []
         color_values = []  # Will store colors for each vertex if colorPerVertex is True
+        texture_values = []  # Will store texture coordinates for each vertex if texture is enabled
         num_indices = len(index)
 
         for i in range(num_indices - 2):
@@ -472,7 +537,7 @@ class GL:
             vertices.extend(point[coord3 : coord3 + 3])  # Vertex 3
             # If colorPerVertex is enabled, collect colors for these vertices
 
-            if colorPerVertex:
+            if colorPerVertex and colorIndex is not None:
                 color1 = colorIndex[i] * 3
                 color2 = colorIndex[i + 1] * 3
                 color3 = colorIndex[i + 2] * 3
@@ -483,11 +548,23 @@ class GL:
                 color_values.extend(vertexColors[color1 : color1 + 3])  # Color 1
                 color_values.extend(vertexColors[color2 : color2 + 3])  # Color 2
                 color_values.extend(vertexColors[color3 : color3 + 3])  # Color 3
+            
+            elif texCoord is not None:
+                t1 = texCoordIndex[i] * 2
+                t2 = texCoordIndex[i + 1] * 2
+                t3 = texCoordIndex[i + 2] * 2
+                texture_values.extend(texCoord[t1 : t1 + 2])
+                texture_values.extend(texCoord[t2 : t2 + 2])
+                texture_values.extend(texCoord[t3 : t3 + 2])
+
+        
 
 
 
         # Now pass the collected vertices and colors to the rendering function
-        GL.triangleSet(vertices, colors, colorPerVertex, vertexColors=color_values if colorPerVertex else None)
+        GL.triangleSet(vertices, colors,
+                    colorPerVertex, vertexColors=color_values if colorPerVertex else None,
+                    texture_values = texture_values if image is not None else None,image = image)
 
         # https://www.web3d.org/specifications/X3Dv4/ISO-IEC19775-1v4-IS/Part01/components/rendering.html#IndexedTriangleStripSet
         # A função indexedTriangleStripSet é usada para desenhar tiras de triângulos
@@ -503,46 +580,6 @@ class GL:
         # todos no sentido horário ou todos no sentido anti-horário, conforme especificado.
 
 
-
-    @staticmethod
-    def indexedFaceSet(coord, coordIndex, colorPerVertex, color, colorIndex,
-                       texCoord, texCoordIndex, colors, current_texture):
-        """Função usada para renderizar IndexedFaceSet."""
-        # https://www.web3d.org/specifications/X3Dv4/ISO-IEC19775-1v4-IS/Part01/components/geometry3D.html#IndexedFaceSet
-        # A função indexedFaceSet é usada para desenhar malhas de triângulos. Ela funciona de
-        # forma muito simular a IndexedTriangleStripSet porém com mais recursos.
-        # Você receberá as coordenadas dos pontos no parâmetro cord, esses
-        # pontos são uma lista de pontos x, y, e z sempre na ordem. Assim coord[0] é o valor
-        # da coordenada x do primeiro ponto, coord[1] o valor y do primeiro ponto, coord[2]
-        # o valor z da coordenada z do primeiro ponto. Já coord[3] é a coordenada x do
-        # segundo ponto e assim por diante. No IndexedFaceSet uma lista de vértices é informada
-        # em coordIndex, o valor -1 indica que a lista acabou.
-        # A ordem de conexão não possui uma ordem oficial, mas em geral se o primeiro ponto com os dois
-        # seguintes e depois este mesmo primeiro ponto com o terçeiro e quarto ponto. Por exemplo: numa
-        # sequencia 0, 1, 2, 3, 4, -1 o primeiro triângulo será com os vértices 0, 1 e 2, depois serão
-        # os vértices 0, 2 e 3, e depois 0, 3 e 4, e assim por diante, até chegar no final da lista.
-        # Adicionalmente essa implementação do IndexedFace aceita cores por vértices, assim
-        # se a flag colorPerVertex estiver habilitada, os vértices também possuirão cores
-        # que servem para definir a cor interna dos poligonos, para isso faça um cálculo
-        # baricêntrico de que cor deverá ter aquela posição. Da mesma forma se pode definir uma
-        # textura para o poligono, para isso, use as coordenadas de textura e depois aplique a
-        # cor da textura conforme a posição do mapeamento. Dentro da classe GPU já está
-        # implementadado um método para a leitura de imagens.
-
-        # Os prints abaixo são só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
-        print("IndexedFaceSet : ")
-        if coord:
-            print("\tpontos(x, y, z) = {0}, coordIndex = {1}".format(coord, coordIndex))
-        print("colorPerVertex = {0}".format(colorPerVertex))
-        if colorPerVertex and color and colorIndex:
-            print("\tcores(r, g, b) = {0}, colorIndex = {1}".format(color, colorIndex))
-        if texCoord and texCoordIndex:
-            print("\tpontos(u, v) = {0}, texCoordIndex = {1}".format(texCoord, texCoordIndex))
-        if current_texture:
-            image = gpu.GPU.load_texture(current_texture[0])
-            print("\t Matriz com image = {0}".format(image))
-            print("\t Dimensões da image = {0}".format(image.shape))
-        print("IndexedFaceSet : colors = {0}".format(colors))  # imprime no terminal as cores
 
 
 
@@ -629,8 +666,9 @@ class GL:
         strips_flat = [item for sublist in strips for item in sublist]
 
         # Call the triangle strip rendering function
-        
-        GL.indexedTriangleStripSet(coord, strips_flat,colors,colorPerVertex, vertex_colors if vertex_colors else colors,colorIndex)
+        GL.indexedTriangleStripSet(coord, strips_flat,colors,
+                                colorPerVertex and color and colorIndex, vertex_colors if vertex_colors else colors,colorIndex,
+                                texCoord, texCoordIndex, image if current_texture else None) 
 
 
 
