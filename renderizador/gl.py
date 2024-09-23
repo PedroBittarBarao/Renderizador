@@ -202,11 +202,13 @@ class GL:
     @staticmethod
     def triangleSet2D(vertices, colors,
                     colorPerVertex = False,vertexColors = None ,zs = None,
-                    texture_values = None,image = None):
+                    texture_values = None,image = None,
+                    transparency = 0):
         """Função usada para renderizar TriangleSet2D."""
 
         if image is not None:
             mipmaps = cf.generate_mipmap(image)
+        
 
         # Get the emissive color, convert to 8-bit RGB
         emissive = colors["emissiveColor"]
@@ -271,7 +273,7 @@ class GL:
                             cr = z * r/zs[0]
                             cg = z * g/zs[1]
                             cb = z * b/zs[2]
-                            GL.super_buffer[x, y] = [int(cr), int(cg), int(cb)]
+                            draw_color = [int(cr), int(cg), int(cb)]
 
                         elif texture_values is not None: # Draw texture
                             image_shape = image.shape[0]
@@ -318,11 +320,18 @@ class GL:
                             flipped_image = np.flip(current_mipmap[:, :, :3],axis=1)
                             r, g, b = flipped_image[min(255, int(u_interpolated * current_shape)), min(255, int(v_interpolated * current_shape))]
 
-                            GL.super_buffer[x, y] = [min(255,int(r)), min(255,int(g)), min(255,int(b))]
+                            draw_color = [min(255,int(r)), min(255,int(g)), min(255,int(b))]
                             # WRONG PERSPECTIVE
                     
                         else:
-                            GL.super_buffer[x, y] = emissive
+                            draw_color = emissive
+
+                        previos_color = GL.super_buffer[x, y]
+                        draw_color = [int((draw_color[0] * (1 - transparency) + previos_color[0] * transparency)),
+                                        int((draw_color[1] * (1 - transparency) + previos_color[1] * transparency)),
+                                        int((draw_color[2] * (1 - transparency) + previos_color[2] * transparency))]
+                        
+                        GL.super_buffer[x, y] = draw_color
             
             for x in range(min_x, max_x + 1):
                 for y in range(min_y, max_y + 1):
@@ -351,6 +360,7 @@ class GL:
         # (emissiveColor), conforme implementar novos materias você deverá suportar outros
         # tipos de cores.
 
+        transparency = colors["transparency"]
         n_trigs = int(len(point) / 9)
         tranform_m = GL.getMatrix()
         cam_to_screen = cf.NDC_to_screen_matrix(GL.width, GL.height)
@@ -379,7 +389,8 @@ class GL:
                 vertexColors[3*t:3*t+3] if colorPerVertex else None,
                 np.array(zs)[0],
                 texture_values[6*t:6*t+6] if texture_values is not None else None,
-                image = image
+                image = image,
+                transparency = transparency
             )
 
     @staticmethod
