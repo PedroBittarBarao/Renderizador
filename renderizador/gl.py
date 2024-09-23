@@ -604,8 +604,49 @@ class GL:
         # essa caixa você vai provavelmente querer tesselar ela em triângulos, para isso
         # encontre os vértices e defina os triângulos.
 
+        sx, sy, sz = size
+        # Define the 8 vertices of the box
+        vertices = [
+            # Front face
+            -sx / 2, -sy / 2, sz / 2,
+            sx / 2, -sy / 2, sz / 2,
+            sx / 2, sy / 2, sz / 2,
+            -sx / 2, sy / 2, sz / 2,
+            # Back face
+            -sx / 2, -sy / 2, -sz / 2,
+            sx / 2, -sy / 2, -sz / 2,
+            sx / 2, sy / 2, -sz / 2,
+            -sx / 2, sy / 2, -sz / 2,
+        ]
+
+        # Define the 12 triangles of the box
+        triangles = [
+            # Front face
+            0, 1, 2,
+            0, 2, 3,
+            # Back face
+            4, 6, 5,
+            4, 7, 6,
+            # Top face
+            3, 2, 6,
+            3, 6, 7,
+            # Bottom face
+            0, 4, 1,
+            1, 4, 5,
+            # Right face
+            1, 5, 2,
+            2, 5, 6,
+            # Left face
+            0, 3, 7,
+            0, 7, 4,
+        ]
+
+        # Call the triangle rendering function with the prepared vertices and triangles
+        #GL.indexedTriangleStripSet(vertices, triangles, colors)
+        
+
         # O print abaixo é só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
-        print("Box : size = {0}".format(size))  # imprime no terminal pontos
+        print(f"Box : size = {sx,sy,sz}")  # imprime no terminal pontos
         print("Box : colors = {0}".format(colors))  # imprime no terminal as cores
 
     
