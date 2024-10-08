@@ -245,3 +245,79 @@ def sphere(raio, div_lon, div_lat):
     triangles = np.array(triangles).flatten()
 
     return triangles
+
+def cone(bottom_radius,height):
+    points = []
+    triangles = []
+    
+    div_lon = 20
+    div_lat = 20
+
+    delta_theta = 2*np.pi / div_lon
+    delta_phi = height / div_lat
+
+    for i in range(div_lon + 1):
+        theta = i * delta_theta
+        for j in range(div_lat + 1):
+            phi = j * delta_phi
+
+            x = bottom_radius * (1 - phi/height) * np.cos(theta)
+            y = phi
+            z = bottom_radius * (1 - phi/height) * np.sin(theta)
+            points.append([x, y, z])
+
+    # Agora conectando os vértices em triângulos
+    for i in range(div_lon):
+        for j in range(div_lat):
+            # Índices dos vértices do triângulo (dois triângulos por quad)
+            p1 = i * (div_lat + 1) + j
+            p2 = p1 + div_lat + 1
+            p3 = p1 + 1
+            p4 = p2 + 1
+
+            # Primeiro triângulo
+            triangles.append([points[p1], points[p2], points[p3]])
+            # Segundo triângulo
+            triangles.append([points[p3], points[p2], points[p4]])
+    
+    triangles = np.array(triangles).flatten()
+
+    return triangles
+
+def cylinder(radius,height):
+    points = []
+    triangles = []
+    
+    div_lon = 20
+    div_lat = 20
+
+    delta_theta = 2*np.pi / div_lon
+    delta_phi = height / div_lat
+
+    for i in range(div_lon + 1):
+        theta = i * delta_theta
+        for j in range(div_lat + 1):
+            phi = j * delta_phi
+
+            x = radius * np.cos(theta)
+            y = phi
+            z = radius * np.sin(theta)
+            points.append([x, y, z])
+
+    # Agora conectando os vértices em triângulos
+    for i in range(div_lon):
+        for j in range(div_lat):
+            # Índices dos vértices do triângulo (dois triângulos por quad)
+            p1 = i * (div_lat + 1) + j
+            p2 = p1 + div_lat + 1
+            p3 = p1 + 1
+            p4 = p2 + 1
+
+            # Primeiro triângulo
+            triangles.append([points[p1], points[p2], points[p3]])
+            # Segundo triângulo
+            triangles.append([points[p3], points[p2], points[p4]])
+    
+    triangles = np.array(triangles).flatten()
+
+    return triangles

@@ -729,7 +729,7 @@ class GL:
         # precisar tesselar ela em triângulos, para isso encontre os vértices e defina
         # os triângulos.
 
-        points = cf.sphere(radius, 20, 20)
+        points = cf.sphere(radius, 15, 15)
         #render first triangle
         GL.triangleSet(points, colors)
 
@@ -745,10 +745,9 @@ class GL:
         # Para desenha esse cone você vai precisar tesselar ele em triângulos, para isso
         # encontre os vértices e defina os triângulos.
 
-        # O print abaixo é só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
-        print("Cone : bottomRadius = {0}".format(bottomRadius)) # imprime no terminal o raio da base do cone
-        print("Cone : height = {0}".format(height)) # imprime no terminal a altura do cone
-        print("Cone : colors = {0}".format(colors)) # imprime no terminal as cores
+        triangles = cf.cone(bottomRadius, height)
+        GL.triangleSet(triangles, colors)
+
 
     @staticmethod
     def cylinder(radius, height, colors):
@@ -761,10 +760,8 @@ class GL:
         # Para desenha esse cilindro você vai precisar tesselar ele em triângulos, para isso
         # encontre os vértices e defina os triângulos.
 
-        # O print abaixo é só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
-        print("Cylinder : radius = {0}".format(radius)) # imprime no terminal o raio do cilindro
-        print("Cylinder : height = {0}".format(height)) # imprime no terminal a altura do cilindro
-        print("Cylinder : colors = {0}".format(colors)) # imprime no terminal as cores
+        triangles = cf.cylinder(radius, height)
+        GL.triangleSet(triangles, colors)
 
     @staticmethod
     def navigationInfo(headlight):
