@@ -229,6 +229,7 @@ class GL:
 
             # If the triangle is in clockwise order, swap vertices to make it counterclockwise
             if area > 0:
+                #print("Clockwise triangle detected, swapping vertices")
                 x0, y0, x1, y1 = x1, y1, x0, y0  # Swap vertices to ensure counterclockwise order
             
             super_x0 = x0*2
@@ -249,20 +250,21 @@ class GL:
             min_y = max(0, math.floor(min(y0, y1, y2)))
             max_y = min(GL.height - 1, math.ceil(max(y0, y1, y2)))
 
+
             # Loop over the bounding box only
-            for x in range(super_min_x, super_max_x + 1):
-                for y in range(super_min_y, super_max_y + 1):
+            for sx in range(super_min_x, super_max_x + 1):
+                for sy in range(super_min_y, super_max_y + 1):
                     # Check if the pixel center (x+0.5, y+0.5) is inside the triangle
-                    if cf.dentro([super_x0, super_y0], [super_x1, super_y1], [super_x2, super_y2], [x + 0.5, y + 0.5]):
+                    if cf.dentro([super_x0, super_y0], [super_x1, super_y1], [super_x2, super_y2], [sx + 0.5, sy + 0.5]):
                         alpha, beta, gamma = cf.calculate_barycentric_coordinates(super_x0, super_y0,
                                                                                 super_x1, super_y1,
                                                                                 super_x2, super_y2,
-                                                                                x, y)
+                                                                                sx+0.5, sy+0.5)
                         if zs is not None:
                             z = 1/(alpha/zs[0] + beta/zs[1] + gamma/zs[2])
 
-                            if z > GL.z_buffer[x, y]:
-                                GL.z_buffer[x, y] = z
+                            if z > GL.z_buffer[sx, sy]:
+                                GL.z_buffer[sx, sy] = z
                             else:
                                 continue # Discard pixel if it is behind another triangle
 
@@ -287,14 +289,14 @@ class GL:
                             alpha_10, beta_10, gamma_10 = cf.calculate_barycentric_coordinates(super_x0, super_y0,
                                                                                             super_x1, super_y1,
                                                                                             super_x2, super_y2,
-                                                                                            x + 1, y)
+                                                                                            sx + 1 + 0.5, sy + 0.5)
                             u_10 = u0 * alpha_10 + u1 * beta_10 + u2 * gamma_10
                             v_10 = v0 * alpha_10 + v1 * beta_10 + v2 * gamma_10
 
                             alpha_01, beta_01, gamma_01 = cf.calculate_barycentric_coordinates(super_x0, super_y0,   
                                                                                             super_x1, super_y1,
                                                                                             super_x2, super_y2,
-                                                                                            x, y + 1)
+                                                                                            sx + 0.5, sy + 1 + 0.5)
                             u_01 = u0 * alpha_01 + u1 * beta_01 + u2 * gamma_01
                             v_01 = v0 * alpha_01 + v1 * beta_01 + v2 * gamma_01
 
@@ -326,19 +328,19 @@ class GL:
                         else:
                             draw_color = emissive
 
-                        previos_color = GL.super_buffer[x, y]
-                        draw_color = [int((draw_color[0] * (1 - transparency) + previos_color[0] * transparency)),
-                                        int((draw_color[1] * (1 - transparency) + previos_color[1] * transparency)),
-                                        int((draw_color[2] * (1 - transparency) + previos_color[2] * transparency))]
+                        previous_color = GL.super_buffer[sx, sy]
+                        draw_color = [int((draw_color[0] * (1 - transparency) + previous_color[0] * transparency)),
+                                        int((draw_color[1] * (1 - transparency) + previous_color[1] * transparency)),
+                                        int((draw_color[2] * (1 - transparency) + previous_color[2] * transparency))]
                         
-                        GL.super_buffer[x, y] = draw_color
+                        GL.super_buffer[sx, sy] = draw_color
             
             for x in range(min_x, max_x + 1):
                 for y in range(min_y, max_y + 1):
-                        p0 = GL.super_buffer[x*2 - 1, y*2]
-                        p1 = GL.super_buffer[x*2, y*2]
-                        p2 = GL.super_buffer[x*2 - 1, y*2 + 1]
-                        p3 = GL.super_buffer[x*2, y*2 + 1]
+                        p0 = GL.super_buffer[x*2, y*2]
+                        p1 = GL.super_buffer[x*2 + 1, y*2]
+                        p2 = GL.super_buffer[x*2, y*2 + 1]
+                        p3 = GL.super_buffer[x*2 + 1, y*2 + 1]
                         #print(p0,p1,p2,p3)
                         gpu.GPU.draw_pixel([x, y], gpu.GPU.RGB8, (p0 + p1 + p2 + p3) / 4)    
 
@@ -525,7 +527,7 @@ class GL:
     @staticmethod
     def indexedTriangleStripSet(point, index, colors,
                                 colorPerVertex=False, vertexColors=None,colorIndex=None,
-                                texCoord=None, texCoordIndex=None, image=None):
+                                texCoord=None, image=None):
         """Função usada para renderizar IndexedTriangleStripSet."""
         
         vertices = []
@@ -561,9 +563,9 @@ class GL:
                 color_values.extend(vertexColors[color3 : color3 + 3])  # Color 3
             
             elif texCoord is not None:
-                t1 = texCoordIndex[i] * 2
-                t2 = texCoordIndex[i + 1] * 2
-                t3 = texCoordIndex[i + 2] * 2
+                t1 = index[i] * 2
+                t2 = index[i + 1] * 2
+                t3 = index[i + 2] * 2
                 texture_values.extend(texCoord[t1 : t1 + 2])
                 texture_values.extend(texCoord[t2 : t2 + 2])
                 texture_values.extend(texCoord[t3 : t3 + 2])
@@ -574,7 +576,7 @@ class GL:
 
         # Now pass the collected vertices and colors to the rendering function
         GL.triangleSet(vertices, colors,
-                    colorPerVertex, vertexColors=color_values if colorPerVertex else None,
+                    colorPerVertex, vertexColors = color_values if colorPerVertex else None,
                     texture_values = texture_values if image is not None else None,image = image)
 
         # https://www.web3d.org/specifications/X3Dv4/ISO-IEC19775-1v4-IS/Part01/components/rendering.html#IndexedTriangleStripSet
@@ -642,14 +644,7 @@ class GL:
         ]
 
         # Call the triangle rendering function with the prepared vertices and triangles
-        #GL.indexedTriangleStripSet(vertices, triangles, colors)
-        
-
-        # O print abaixo é só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
-        print(f"Box : size = {sx,sy,sz}")  # imprime no terminal pontos
-        print("Box : colors = {0}".format(colors))  # imprime no terminal as cores
-
-    
+        GL.indexedTriangleStripSet(vertices, triangles, colors)
 
     @staticmethod
     def indexedFaceSet(
@@ -664,7 +659,6 @@ class GL:
         current_texture,
     ):
         """Função usada para renderizar IndexedFaceSet."""
-
         # Handle texture cases first
         if current_texture:
             image = gpu.GPU.load_texture(current_texture[0])
@@ -720,7 +714,7 @@ class GL:
         # Call the triangle strip rendering function
         GL.indexedTriangleStripSet(coord, strips_flat,colors,
                                 colorPerVertex and color and colorIndex, vertex_colors if vertex_colors else colors,colorIndex,
-                                texCoord, texCoordIndex, image if current_texture else None) 
+                                texCoord, image if current_texture else None) 
 
 
 
@@ -735,9 +729,10 @@ class GL:
         # precisar tesselar ela em triângulos, para isso encontre os vértices e defina
         # os triângulos.
 
-        # O print abaixo é só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
-        print("Sphere : radius = {0}".format(radius)) # imprime no terminal o raio da esfera
-        print("Sphere : colors = {0}".format(colors)) # imprime no terminal as cores
+        points = cf.sphere(radius, 20, 20)
+        #render first triangle
+        GL.triangleSet(points, colors)
+
 
     @staticmethod
     def cone(bottomRadius, height, colors):

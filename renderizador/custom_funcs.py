@@ -210,3 +210,38 @@ def generate_mipmap(image):
         current_image = reduced_image
 
     return mipmap_levels
+
+def sphere(raio, div_lon, div_lat):
+    points = []
+    triangles = []
+    
+    delta_theta = 2*np.pi / div_lon
+    delta_phi = np.pi / div_lat
+
+    for i in range(div_lon + 1):
+        theta = i * delta_theta
+        for j in range(div_lat + 1):
+            phi = j * delta_phi
+
+            x = raio * np.sin(phi) * np.cos(theta)
+            y = raio * np.sin(phi) * np.sin(theta)
+            z = raio * np.cos(phi)
+            points.append([x, y, z])
+
+    # Agora conectando os vértices em triângulos
+    for i in range(div_lon):
+        for j in range(div_lat):
+            # Índices dos vértices do triângulo (dois triângulos por quad)
+            p1 = i * (div_lat + 1) + j
+            p2 = p1 + div_lat + 1
+            p3 = p1 + 1
+            p4 = p2 + 1
+
+            # Primeiro triângulo
+            triangles.append([points[p1], points[p2], points[p3]])
+            # Segundo triângulo
+            triangles.append([points[p3], points[p2], points[p4]])
+    
+    triangles = np.array(triangles).flatten()
+
+    return triangles
