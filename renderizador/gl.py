@@ -6,7 +6,7 @@
 """
 Biblioteca Gráfica / Graphics Library.
 
-Desenvolvido por: <SEU NOME AQUI>
+Desenvolvido por: Pedro Bittar Barão
 Disciplina: Computação Gráfica
 Data: <DATA DE INÍCIO DA IMPLEMENTAÇÃO>
 """
@@ -27,6 +27,7 @@ class GL:
     far = 100  # plano de corte distante
     p = None
     z_buffer = None
+    ambient_intensity = 0.0
 
     @staticmethod
     def setup(width, height, near=0.5, far=100):
@@ -41,6 +42,8 @@ class GL:
                               [0, 0, 0, 1]])]
         GL.super_buffer = np.zeros((GL.width*2, GL.height*2, 3))
         GL.z_buffer = - np.inf * np.ones((GL.width*2, GL.height*2))
+        GL.directional_light = {"direction": np.array([0, 0, -1]), "color": np.array([1, 1, 1]), "intensity": 0}
+        GL.point_light = {"position": np.array([0, 0, 0]), "color": np.array([1, 1, 1]), "intensity": 0}
 
     @staticmethod
     def pushMatrix(matrix):
@@ -203,16 +206,27 @@ class GL:
     def triangleSet2D(vertices, colors,
                     colorPerVertex = False,vertexColors = None ,zs = None,
                     texture_values = None,image = None,
-                    transparency = 0):
+                    transparency = 0,
+                    vertex_normals = None,
+                    face_normal = None):
         """Função usada para renderizar TriangleSet2D."""
 
         if image is not None:
             mipmaps = cf.generate_mipmap(image)
-        
 
         # Get the emissive color, convert to 8-bit RGB
-        emissive = colors["emissiveColor"]
-        emissive = [int(i * 255) for i in emissive]
+        emissive_color = colors["emissiveColor"]
+        diffuse_color = colors["diffuseColor"]
+        specular_color = colors["specularColor"]
+        shininess = colors["shininess"]
+        emissive_color = [int(i * 255) for i in emissive_color]
+        diffuse_color = [int(i * 255) for i in diffuse_color]
+        specular_color = [int(i * 255) for i in specular_color]
+
+        #initialize diffuse, specular and ambient colors as 0
+        ambient_light  = np.array([0, 0, 0])
+        diffuse_light  = np.array([0, 0, 0])
+        specular_light = np.array([0, 0, 0])
 
         # Number of triangles to process
         n_trigs = int(len(vertices) / 6)
@@ -249,7 +263,6 @@ class GL:
             max_x = min(GL.width - 1, math.ceil(max(x0, x1, x2)))
             min_y = max(0, math.floor(min(y0, y1, y2)))
             max_y = min(GL.height - 1, math.ceil(max(y0, y1, y2)))
-
 
             # Loop over the bounding box only
             for sx in range(super_min_x, super_max_x + 1):
@@ -326,7 +339,23 @@ class GL:
                             # WRONG PERSPECTIVE
                     
                         else:
-                            draw_color = emissive
+                            if face_normal is not None:
+                                normal = face_normal
+                            else:
+                                x = vertex_normals[3*i] * alpha + vertex_normals[3*i+1] * beta + vertex_normals[3*i+2]* gamma
+                                y = vertex_normals[3*i+3] * alpha + vertex_normals[3*i+4] * beta + vertex_normals[3*i+5] * gamma
+                                z = vertex_normals[3*i+6] * alpha + vertex_normals[3*i+7] * beta + vertex_normals[3*i+8] * gamma
+                                normal = np.array([x, y, z])
+
+                            cos = max(0,-np.dot(normal, GL.directional_light["direction"]))
+
+                            intensity = GL.directional_light["intensity"] * cos
+                            diffuse_light = intensity * np.array(diffuse_color)
+                            diffuse_light = np.clip(diffuse_light, 0, 255)
+
+                            draw_color = emissive_color + diffuse_light + ambient_light + specular_light
+                            draw_color = np.clip(draw_color, 0, 255)
+                            draw_color = [int(i) for i in draw_color]
 
                         previous_color = GL.super_buffer[sx, sy]
                         draw_color = [int((draw_color[0] * (1 - transparency) + previous_color[0] * transparency)),
@@ -347,7 +376,8 @@ class GL:
 
     @staticmethod
     def triangleSet(point, colors,colorPerVertex = False,vertexColors = None,
-                    texture_values = None,image = None):
+                    texture_values = None,image = None,
+                    vertex_normals = None):
         """Função usada para renderizar TriangleSet."""
         # Nessa função você receberá pontos no parâmetro point, esses pontos são uma lista
         # de pontos x, y, e z sempre na ordem. Assim point[0] é o valor da coordenada x do
@@ -363,6 +393,7 @@ class GL:
         # tipos de cores.
 
         transparency = colors["transparency"]
+        face_normal = None
         n_trigs = int(len(point) / 9)
         tranform_m = GL.getMatrix()
         cam_to_screen = cf.NDC_to_screen_matrix(GL.width, GL.height)
@@ -370,14 +401,27 @@ class GL:
             x1, y1, z1 = point[9 * t : 9 * t + 3]
             x2, y2, z2 = point[9 * t + 3 : 9 * t + 6]
             x3, y3, z3 = point[9 * t + 6 : 9 * t + 9]
-            trig_p = np.array([[x1, x2, x3],
+            if (x1 == x2 and y1 == y2 and z1 == z2):
+                raise ValueError("Vertices 1 and 2 are the same",f"{x1},{y1},{z1}]")
+            if (x1 == x3 and y1 == y3 and z1 == z3):
+                raise ValueError("Vertices 1 and 3 are the same",f"{x1},{y1},{z1}")
+            if (x2 == x3 and y2 == y3 and z2 == z3):
+                raise ValueError("Vertices 2 and 3 are the same",f"{x2},{y2},{z2}")
+            triangle_p = np.array([[x1, x2, x3],
                                [y1, y2, y3],
                                [z1, z2, z3],
                                [1 , 1 , 1 ]])
-            trig_p = tranform_m @ trig_p
-            aux_m = GL.pm @ trig_p  # perspective X rotation X translation X points
+            transformed_p = tranform_m @ triangle_p
+            if vertex_normals is None:
+                normal = np.cross(transformed_p[:3,1] - transformed_p[:3,0], transformed_p[:3,2] - transformed_p[:3,0])
+                face_normal = normal / np.linalg.norm(normal)
+                if normal[0] == 0 and normal[1] == 0 and normal[2] == 0:
+                    #print(f"Normal is zero: {trig_p[:3,:]}")
+                    print("Normal is zero")
+                    print(triangle_p)
+            aux_m = GL.pm @ transformed_p  # perspective X rotation X translation X points
             NDC_m = aux_m / aux_m[3][0]  # NDC
-            zs = (GL.look_at@trig_p)[2]
+            zs = (GL.look_at@transformed_p)[2]
             screen_m = cam_to_screen @ NDC_m
             screen_m = np.array(screen_m)
             GL.triangleSet2D(
@@ -392,7 +436,9 @@ class GL:
                 np.array(zs)[0],
                 texture_values[6*t:6*t+6] if texture_values is not None else None,
                 image = image,
-                transparency = transparency
+                transparency = transparency,
+                vertex_normals = vertex_normals[9*t:9*t+9] if vertex_normals is not None else None,
+                face_normal = face_normal
             )
 
     @staticmethod
@@ -439,12 +485,6 @@ class GL:
 
         GL.pm = perspective_m @ look_at_mat
 
-        # O print abaixo é só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
-        """ print("Viewpoint : ", end='')
-        print("position = {0} ".format(position), end='')
-        print("orientation = {0} ".format(orientation), end='')
-        print(f"aspect{aspect} ",end="")
-        print("fieldOfView = {0} ".format(fieldOfView)) """
 
     @staticmethod
     def transform_in(translation, scale, rotation):
@@ -554,10 +594,7 @@ class GL:
                 color1 = colorIndex[i] * 3
                 color2 = colorIndex[i + 1] * 3
                 color3 = colorIndex[i + 2] * 3
-                """ print(vertexColors)
-                print(f"color1 {vertexColors[color1:color1 + 3]} {color1}")
-                print(f"color2 {vertexColors[color2:color2 + 3]} {color2}")
-                print(f"color3 {vertexColors[color3:color3 + 3]} {color3}") """
+
                 color_values.extend(vertexColors[color1 : color1 + 3])  # Color 1
                 color_values.extend(vertexColors[color2 : color2 + 3])  # Color 2
                 color_values.extend(vertexColors[color3 : color3 + 3])  # Color 3
@@ -729,9 +766,8 @@ class GL:
         # precisar tesselar ela em triângulos, para isso encontre os vértices e defina
         # os triângulos.
 
-        points = cf.sphere(radius, 15, 15)
-        #render first triangle
-        GL.triangleSet(points, colors)
+        points,vertex_normals = cf.sphere(radius,8,8)
+        GL.triangleSet(points, colors,vertex_normals=vertex_normals)
 
 
     @staticmethod
@@ -772,6 +808,9 @@ class GL:
         # A luz headlight deve ser direcional, ter intensidade = 1, cor = (1 1 1),
         # ambientIntensity = 0,0 e direção = (0 0 −1).
 
+        if headlight:
+            GL.directionalLight(0.0, [1, 1, 1], 1, [0, 0, -1])
+
         # O print abaixo é só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
         print(
             "NavigationInfo : headlight = {0}".format(headlight)
@@ -785,6 +824,10 @@ class GL:
         # cor, intensidade. O campo de direção especifica o vetor de direção da iluminação
         # que emana da fonte de luz no sistema de coordenadas local. A luz é emitida ao
         # longo de raios paralelos de uma distância infinita.
+        GL.directional_light = {"ambient_intensity":ambientIntensity,
+                                "color":color,
+                                "intensity":intensity,
+                                "direction":direction}
 
         # O print abaixo é só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
         print("DirectionalLight : ambientIntensity = {0}".format(ambientIntensity))
@@ -804,6 +847,10 @@ class GL:
         # Possui os campos básicos ambientIntensity, cor, intensidade. Um nó PointLight ilumina
         # a geometria em um raio de sua localização. O campo do raio deve ser maior ou igual a
         # zero. A iluminação do nó PointLight diminui com a distância especificada.
+        GL.point_light = {"ambient_intensity":ambientIntensity,
+                            "color":color,
+                            "intensity":intensity,
+                            "location":location}
 
         # O print abaixo é só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
         print("PointLight : ambientIntensity = {0}".format(ambientIntensity))

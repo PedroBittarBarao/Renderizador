@@ -2,8 +2,8 @@
 Module: custom_funcs.py
 This module contains custom functions for rendering.
 Functions:
-- fazNormal(vec): Calculates the normal vector of a given vector.
-- produtoEscalar(vec0, vec1): Calculates the dot product of two vectors.
+- faz_normal(vec): Calculates the normal vector of a given vector.
+- produto_escalar(vec0, vec1): Calculates the dot product of two vectors.
 - L(p0, p1, p): Determines if a point is on the left side of a line.
 - dentro(p0, p1, p2, p): Determines if a point is inside a triangle.
 - diamond(px, py, x, y): Determines if a point is inside a diamond shape.
@@ -214,6 +214,8 @@ def generate_mipmap(image):
 def sphere(raio, div_lon, div_lat):
     points = []
     triangles = []
+    normals = []
+    triangle_normals = []
     
     delta_theta = 2*np.pi / div_lon
     delta_phi = np.pi / div_lat
@@ -228,6 +230,9 @@ def sphere(raio, div_lon, div_lat):
             z = raio * np.cos(phi)
             points.append([x, y, z])
 
+            norm = np.array([x, y, z]) / np.linalg.norm([x, y, z])
+            normals.append(norm)
+
     # Agora conectando os vértices em triângulos
     for i in range(div_lon):
         for j in range(div_lat):
@@ -239,12 +244,15 @@ def sphere(raio, div_lon, div_lat):
 
             # Primeiro triângulo
             triangles.append([points[p1], points[p2], points[p3]])
+            triangle_normals.append([normals[p1], normals[p2], normals[p3]])
             # Segundo triângulo
             triangles.append([points[p3], points[p2], points[p4]])
+            triangle_normals.append([normals[p3], normals[p2], normals[p4]])
     
     triangles = np.array(triangles).flatten()
+    triangle_normals = np.array(triangle_normals).flatten()
 
-    return triangles
+    return triangles, triangle_normals
 
 def cone(bottom_radius,height):
     points = []
