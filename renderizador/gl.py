@@ -402,11 +402,11 @@ class GL:
             x2, y2, z2 = point[9 * t + 3 : 9 * t + 6]
             x3, y3, z3 = point[9 * t + 6 : 9 * t + 9]
             if (x1 == x2 and y1 == y2 and z1 == z2):
-                raise ValueError("Vertices 1 and 2 are the same",f"{x1},{y1},{z1}]")
+                raise ValueError("Vertices 1 and 2 are the same",f"{x1},{y1},{z1}] in triangle {t} of {n_trigs}")
             if (x1 == x3 and y1 == y3 and z1 == z3):
-                raise ValueError("Vertices 1 and 3 are the same",f"{x1},{y1},{z1}")
+                raise ValueError("Vertices 1 and 3 are the same",f"{x1},{y1},{z1} in triangle {t} of {n_trigs}")
             if (x2 == x3 and y2 == y3 and z2 == z3):
-                raise ValueError("Vertices 2 and 3 are the same",f"{x2},{y2},{z2}")
+                raise ValueError("Vertices 2 and 3 are the same",f"{x2},{y2},{z2} in triangle {t} of {n_trigs}")
             triangle_p = np.array([[x1, x2, x3],
                                [y1, y2, y3],
                                [z1, z2, z3],
@@ -643,45 +643,10 @@ class GL:
         # essa caixa você vai provavelmente querer tesselar ela em triângulos, para isso
         # encontre os vértices e defina os triângulos.
 
-        sx, sy, sz = size
-        # Define the 8 vertices of the box
-        vertices = [
-            # Front face
-            -sx / 2, -sy / 2, sz / 2,
-            sx / 2, -sy / 2, sz / 2,
-            sx / 2, sy / 2, sz / 2,
-            -sx / 2, sy / 2, sz / 2,
-            # Back face
-            -sx / 2, -sy / 2, -sz / 2,
-            sx / 2, -sy / 2, -sz / 2,
-            sx / 2, sy / 2, -sz / 2,
-            -sx / 2, sy / 2, -sz / 2,
-        ]
-
-        # Define the 12 triangles of the box
-        triangles = [
-            # Front face
-            0, 1, 2,
-            0, 2, 3,
-            # Back face
-            4, 6, 5,
-            4, 7, 6,
-            # Top face
-            3, 2, 6,
-            3, 6, 7,
-            # Bottom face
-            0, 4, 1,
-            1, 4, 5,
-            # Right face
-            1, 5, 2,
-            2, 5, 6,
-            # Left face
-            0, 3, 7,
-            0, 7, 4,
-        ]
+        point = cf.box(size)
 
         # Call the triangle rendering function with the prepared vertices and triangles
-        GL.indexedTriangleStripSet(vertices, triangles, colors)
+        GL.triangleSet(point, colors)
 
     @staticmethod
     def indexedFaceSet(

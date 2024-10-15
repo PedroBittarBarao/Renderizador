@@ -212,17 +212,29 @@ def generate_mipmap(image):
     return mipmap_levels
 
 def sphere(raio, div_lon, div_lat):
+    """
+    Generates a 3D sphere mesh with specified radius and divisions.
+    Args:
+        raio (float): The radius of the sphere.
+        div_lon (int): The number of longitudinal divisions (slices).
+        div_lat (int): The number of latitudinal divisions (stacks).
+    Returns:
+        tuple: A tuple containing:
+            - triangles (numpy.ndarray): A flattened array of triangle vertices.
+            - triangle_normals (numpy.ndarray): A flattened array of triangle normals.
+    """
     points = []
     triangles = []
     normals = []
     triangle_normals = []
-    
-    delta_theta = 2*np.pi / div_lon
+
+    delta_theta = 2 * np.pi / div_lon
     delta_phi = np.pi / div_lat
 
+    # Gerando pontos da esfera
     for i in range(div_lon + 1):
         theta = i * delta_theta
-        for j in range(div_lat + 1):
+        for j in range(1, div_lat):  # Evitamos os pólos direto aqui
             phi = j * delta_phi
 
             x = raio * np.sin(phi) * np.cos(theta)
@@ -233,12 +245,22 @@ def sphere(raio, div_lon, div_lat):
             norm = np.array([x, y, z]) / np.linalg.norm([x, y, z])
             normals.append(norm)
 
-    # Agora conectando os vértices em triângulos
+    # Adiciona o pólo superior e inferior
+    points.append([0, 0, raio])  # Pólo norte
+    normals.append([0, 0, 1])
+
+    points.append([0, 0, -raio])  # Pólo sul
+    normals.append([0, 0, -1])
+
+    pole_north = len(points) - 2
+    pole_south = len(points) - 1
+
+    # Conectando vértices em triângulos
     for i in range(div_lon):
-        for j in range(div_lat):
+        for j in range(div_lat - 2):
             # Índices dos vértices do triângulo (dois triângulos por quad)
-            p1 = i * (div_lat + 1) + j
-            p2 = p1 + div_lat + 1
+            p1 = i * (div_lat - 1) + j
+            p2 = p1 + div_lat - 1
             p3 = p1 + 1
             p4 = p2 + 1
 
@@ -248,49 +270,121 @@ def sphere(raio, div_lon, div_lat):
             # Segundo triângulo
             triangles.append([points[p3], points[p2], points[p4]])
             triangle_normals.append([normals[p3], normals[p2], normals[p4]])
-    
+
+        # Conectar os triângulos com o pólo norte
+        triangles.append([points[pole_north], points[i * (div_lat - 1)], points[(i + 1) % div_lon * (div_lat - 1)]])
+        triangle_normals.append([normals[pole_north], normals[i * (div_lat - 1)], normals[(i + 1) % div_lon * (div_lat - 1)]])
+
+        # Conectar os triângulos com o pólo sul
+        triangles.append([points[pole_south], points[(i + 1) % div_lon * (div_lat - 1) + (div_lat - 2)], points[i * (div_lat - 1) + (div_lat - 2)]])
+        triangle_normals.append([normals[pole_south], normals[(i + 1) % div_lon * (div_lat - 1) + (div_lat - 2)], normals[i * (div_lat - 1) + (div_lat - 2)]])
+
     triangles = np.array(triangles).flatten()
     triangle_normals = np.array(triangle_normals).flatten()
 
     return triangles, triangle_normals
 
-def cone(bottom_radius,height):
+
+def cone(bottom_radius, height):
+    """
+    Generates a 3D cone mesh with the specified bottom radius and height.
+    Args:
+        bottom_radius (float): The radius of the cone's base.
+        height (float): The height of the cone.
+    Returns:
+        np.ndarray: A flattened array of triangles representing the cone mesh. Each triangle is defined by three points.
+    """
     points = []
     triangles = []
     
-    div_lon = 20
-    div_lat = 20
+    div_lon = 20  # Número de divisões longitudinais (fatias ao redor)
+    delta_theta = 2 * np.pi / div_lon  # Ângulo entre as fatias
 
-    delta_theta = 2*np.pi / div_lon
-    delta_phi = height / div_lat
+    # Adicionar o vértice do topo
+    top_vertex = [0, height, 0]
+    points.append(top_vertex)
 
-    for i in range(div_lon + 1):
-        theta = i * delta_theta
-        for j in range(div_lat + 1):
-            phi = j * delta_phi
-
-            x = bottom_radius * (1 - phi/height) * np.cos(theta)
-            y = phi
-            z = bottom_radius * (1 - phi/height) * np.sin(theta)
-            points.append([x, y, z])
-
-    # Agora conectando os vértices em triângulos
+    # Gerar vértices ao redor da base
     for i in range(div_lon):
-        for j in range(div_lat):
-            # Índices dos vértices do triângulo (dois triângulos por quad)
-            p1 = i * (div_lat + 1) + j
-            p2 = p1 + div_lat + 1
-            p3 = p1 + 1
-            p4 = p2 + 1
+        theta = i * delta_theta
+        x = bottom_radius * np.cos(theta)
+        z = bottom_radius * np.sin(theta)
+        points.append([x, 0, z])
 
-            # Primeiro triângulo
-            triangles.append([points[p1], points[p2], points[p3]])
-            # Segundo triângulo
-            triangles.append([points[p3], points[p2], points[p4]])
-    
+    # Adicionar o vértice central da base
+    base_center = [0, 0, 0]
+    points.append(base_center)
+
+    # Conectar o topo aos vértices da base para formar as faces laterais
+    for i in range(div_lon):
+        p1 = 0  # Vértice do topo
+        p2 = i + 1  # Vértice na base
+        p3 = (i + 1) % div_lon + 1  # Próximo vértice na base
+
+        # Triângulo lateral
+        triangles.append([points[p1], points[p2], points[p3]])
+
+    # Conectar os vértices da base ao centro da base para formar a base do cone
+    base_center_index = len(points) - 1
+    for i in range(div_lon):
+        p1 = base_center_index  # Vértice central da base
+        p2 = i + 1  # Vértice na base
+        p3 = (i + 1) % div_lon + 1  # Próximo vértice na base
+
+        # Triângulo da base
+        triangles.append([points[p1], points[p3], points[p2]])
+
     triangles = np.array(triangles).flatten()
 
     return triangles
+
+def box(size):
+    sx, sy, sz = size
+    # Define the 8 vertices of the box
+    vertices = [
+        # Front face
+        -sx / 2, -sy / 2, sz / 2,
+        sx / 2, -sy / 2, sz / 2,
+        sx / 2, sy / 2, sz / 2,
+        -sx / 2, sy / 2, sz / 2,
+        # Back face
+        -sx / 2, -sy / 2, -sz / 2,
+        sx / 2, -sy / 2, -sz / 2,
+        sx / 2, sy / 2, -sz / 2,
+        -sx / 2, sy / 2, -sz / 2,
+    ]
+
+
+    # Define the 12 triangles of the box
+    triangles = [
+        # Front face
+        0, 1, 2,
+        0, 2, 3,
+        # Back face
+        4, 6, 5,
+        4, 7, 6,
+        # Top face
+        3, 2, 6,
+        3, 6, 7,
+        # Bottom face
+        0, 4, 1,
+        1, 4, 5,
+        # Right face
+        1, 5, 2,
+        2, 5, 6,
+        # Left face
+        0, 3, 7,
+        0, 7, 4,
+    ]
+
+    point = []
+    for i in range(len(triangles)):
+        point.append(vertices[triangles[i]*3])
+        point.append(vertices[triangles[i]*3+1])
+        point.append(vertices[triangles[i]*3+2])
+    #print(f"point = {point}")
+    
+    return np.array(point)
 
 def cylinder(radius,height):
     points = []
