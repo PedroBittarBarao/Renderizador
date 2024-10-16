@@ -351,10 +351,8 @@ class GL:
                                     normal = face_normal
                                 else:
                                     # pixel normal = interpolated vertex normal
-                                    x = vertex_normals[3*i] * alpha + vertex_normals[3*i+1] * beta + vertex_normals[3*i+2]* gamma
-                                    y = vertex_normals[3*i+3] * alpha + vertex_normals[3*i+4] * beta + vertex_normals[3*i+5] * gamma
-                                    z = vertex_normals[3*i+6] * alpha + vertex_normals[3*i+7] * beta + vertex_normals[3*i+8] * gamma
-                                    normal = np.array([x, y, z])
+                                    normal = np.array(alpha * vertex_normals[:, 0] + beta * vertex_normals[:, 1] + gamma * vertex_normals[:, 2]).T[0]
+                                    normal = normal / np.linalg.norm(normal)
                                 
                                 cos = max(0,- (normal[0]*GL.directional_light["direction"][0] + normal[1]*GL.directional_light["direction"][1] + normal[2]*GL.directional_light["direction"][2])) # cos of the angle between the normal and the light direction
 
@@ -437,6 +435,25 @@ class GL:
                     looked_at[:3].transpose()[2] - looked_at[:3].transpose()[0])
                 
                 face_normal = normal[0] / np.linalg.norm(normal)
+            else:
+                # Extract normal vectors and convert them to column vectors (3x1)
+                normal_0 = np.matrix(vertex_normals[9*t:9*t+3]).T  # (3,1)
+                normal_1 = np.matrix(vertex_normals[9*t+3:9*t+6]).T  # (3,1)
+                normal_2 = np.matrix(vertex_normals[9*t+6:9*t+9]).T  # (3,1)
+                
+                # Convert normal vectors to homogeneous coordinates by appending 0
+                normal_0_h = np.vstack([normal_0, [0]])  # (4,1)
+                normal_1_h = np.vstack([normal_1, [0]])  # (4,1)
+                normal_2_h = np.vstack([normal_2, [0]])  # (4,1)
+
+                # Combine the homogenous normal vectors into a 4x3 matrix
+                normal_m_h = np.array([normal_0_h, normal_1_h, normal_2_h]).T  # (4,3)
+
+                # Now you can multiply the 4x4 transformation matrix with the 4x3 normal matrix
+                transformed__normals_m = GL.look_at @ tranform_m @ normal_m_h
+
+                # Extract the transformed normal vectors to a list in xyz order
+                vertex_normals_transformed = transformed__normals_m[:3]
 
             aux_m = GL.pm @ transformed_p  # perspective X rotation X translation X points
             NDC_m = aux_m / aux_m[3][0]  # NDC
@@ -457,7 +474,7 @@ class GL:
                 texture_values[6*t:6*t+6] if texture_values is not None else None,
                 image = image,
                 transparency = transparency,
-                vertex_normals = vertex_normals[9*t:9*t+9] if vertex_normals is not None else None,
+                vertex_normals = vertex_normals_transformed if vertex_normals is not None else None,
                 face_normal = face_normal
             )
 
@@ -751,7 +768,7 @@ class GL:
         # precisar tesselar ela em triângulos, para isso encontre os vértices e defina
         # os triângulos.
 
-        points,vertex_normals = cf.sphere(radius,8,8)
+        points,vertex_normals = cf.sphere(radius,16,16)
         GL.triangleSet(points, colors,vertex_normals=vertex_normals)
 
 
