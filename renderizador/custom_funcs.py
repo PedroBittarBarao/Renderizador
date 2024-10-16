@@ -423,3 +423,9 @@ def cylinder(radius,height):
     triangles = np.array(triangles).flatten()
 
     return triangles
+
+def normal_to_color(normal):
+    return [int((normal[0] + 1) * 127.5), int((normal[1] + 1) * 127.5), int((normal[2] + 1) * 127.5)]
+
+def color_to_normal(color):
+    return [(color[0] / 127.5) - 1, (color[1] / 127.5) - 1, (color[2] / 127.5) - 1]

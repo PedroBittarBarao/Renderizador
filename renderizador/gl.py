@@ -223,20 +223,23 @@ class GL:
         diffuse_color = [int(i * 255) for i in diffuse_color]
         specular_color = [int(i * 255) for i in specular_color]
 
-        #initialize diffuse, specular and ambient colors as 0
-        ambient_light  = np.array([0, 0, 0])
-        diffuse_light  = np.array([0, 0, 0])
-        specular_light = np.array([0, 0, 0])
-
         # Number of triangles to process
         n_trigs = int(len(vertices) / 6)
 
         # Iterate over each triangle
         for i in range(n_trigs):
+            #initialize diffuse, specular and ambient colors as 0
+            ambient_light  = np.array([0, 0, 0])
+            diffuse_light  = np.array([0, 0, 0])
+            specular_light = np.array([0, 0, 0])
+
             # Extract triangle vertices
             x0, y0 = vertices[6 * i], vertices[6 * i + 1]
             x1, y1 = vertices[6 * i + 2], vertices[6 * i + 3]
             x2, y2 = vertices[6 * i + 4], vertices[6 * i + 5]
+
+            """ print(f"zs = {zs}")
+            print(f"fn = {face_normal}") """
 
             # Calculate the signed area of the triangle
             area = cf.area([x0, y0], [x1, y1], [x2, y2])
@@ -336,34 +339,44 @@ class GL:
                             r, g, b = flipped_image[min(255, int(u_interpolated * current_shape)), min(255, int(v_interpolated * current_shape))]
 
                             draw_color = [min(255,int(r)), min(255,int(g)), min(255,int(b))]
-                            # WRONG PERSPECTIVE
                     
                         else:
                             if face_normal is not None:
+                                # pixel normal = face normal
                                 normal = face_normal
                             else:
+                                # pixel normal = interpolated vertex normal
                                 x = vertex_normals[3*i] * alpha + vertex_normals[3*i+1] * beta + vertex_normals[3*i+2]* gamma
                                 y = vertex_normals[3*i+3] * alpha + vertex_normals[3*i+4] * beta + vertex_normals[3*i+5] * gamma
                                 z = vertex_normals[3*i+6] * alpha + vertex_normals[3*i+7] * beta + vertex_normals[3*i+8] * gamma
                                 normal = np.array([x, y, z])
-
-                            cos = max(0,-np.dot(normal, GL.directional_light["direction"]))
+                            
+                            cos = max(0,- (normal[0]*GL.directional_light["direction"][0] + normal[1]*GL.directional_light["direction"][1] + normal[2]*GL.directional_light["direction"][2])) # cos of the angle between the normal and the light direction
 
                             intensity = GL.directional_light["intensity"] * cos
                             diffuse_light = intensity * np.array(diffuse_color)
                             diffuse_light = np.clip(diffuse_light, 0, 255)
+                            # complete with specular, ambient and emissive light
+
+
 
                             draw_color = emissive_color + diffuse_light + ambient_light + specular_light
                             draw_color = np.clip(draw_color, 0, 255)
                             draw_color = [int(i) for i in draw_color]
 
+                        # Transparency
                         previous_color = GL.super_buffer[sx, sy]
                         draw_color = [int((draw_color[0] * (1 - transparency) + previous_color[0] * transparency)),
                                         int((draw_color[1] * (1 - transparency) + previous_color[1] * transparency)),
                                         int((draw_color[2] * (1 - transparency) + previous_color[2] * transparency))]
                         
+                        # Debug: draw normal components xyz as rgb color in the triangle
+                        #draw_color = cf.normal_to_color(normal)
+        
                         GL.super_buffer[sx, sy] = draw_color
+
             
+            # Draw the triangle on the screen (supersampled)
             for x in range(min_x, max_x + 1):
                 for y in range(min_y, max_y + 1):
                         p0 = GL.super_buffer[x*2, y*2]
@@ -412,18 +425,21 @@ class GL:
                                [z1, z2, z3],
                                [1 , 1 , 1 ]])
             transformed_p = tranform_m @ triangle_p
+            looked_at = GL.look_at @ transformed_p
+
             if vertex_normals is None:
-                normal = np.cross(transformed_p[:3,1] - transformed_p[:3,0], transformed_p[:3,2] - transformed_p[:3,0])
-                face_normal = normal / np.linalg.norm(normal)
-                if normal[0] == 0 and normal[1] == 0 and normal[2] == 0:
-                    #print(f"Normal is zero: {trig_p[:3,:]}")
-                    print("Normal is zero")
-                    print(triangle_p)
+                normal = np.cross(
+                    looked_at[:3].transpose()[1] - looked_at[:3].transpose()[0],
+                    looked_at[:3].transpose()[2] - looked_at[:3].transpose()[0])
+                
+                face_normal = normal[0] / np.linalg.norm(normal)
+
             aux_m = GL.pm @ transformed_p  # perspective X rotation X translation X points
             NDC_m = aux_m / aux_m[3][0]  # NDC
-            zs = (GL.look_at@transformed_p)[2]
+            zs = (looked_at)[2]
             screen_m = cam_to_screen @ NDC_m
             screen_m = np.array(screen_m)
+
             GL.triangleSet2D(
                 [
                     screen_m[0][0],screen_m[1][0],
