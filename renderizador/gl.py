@@ -223,6 +223,8 @@ class GL:
         diffuse_color = [int(i * 255) for i in diffuse_color]
         specular_color = [int(i * 255) for i in specular_color]
 
+        has_lights = GL.directional_light["intensity"] > 0 or GL.point_light["intensity"] > 0
+
         # Number of triangles to process
         n_trigs = int(len(vertices) / 6)
 
@@ -341,27 +343,29 @@ class GL:
                             draw_color = [min(255,int(r)), min(255,int(g)), min(255,int(b))]
                     
                         else:
-                            if face_normal is not None:
-                                # pixel normal = face normal
-                                normal = face_normal
+                            if not has_lights: # Draw only emissive color if there are no lights
+                                draw_color = emissive_color
                             else:
-                                # pixel normal = interpolated vertex normal
-                                x = vertex_normals[3*i] * alpha + vertex_normals[3*i+1] * beta + vertex_normals[3*i+2]* gamma
-                                y = vertex_normals[3*i+3] * alpha + vertex_normals[3*i+4] * beta + vertex_normals[3*i+5] * gamma
-                                z = vertex_normals[3*i+6] * alpha + vertex_normals[3*i+7] * beta + vertex_normals[3*i+8] * gamma
-                                normal = np.array([x, y, z])
-                            
-                            cos = max(0,- (normal[0]*GL.directional_light["direction"][0] + normal[1]*GL.directional_light["direction"][1] + normal[2]*GL.directional_light["direction"][2])) # cos of the angle between the normal and the light direction
+                                if face_normal is not None:
+                                    # pixel normal = face normal
+                                    normal = face_normal
+                                else:
+                                    # pixel normal = interpolated vertex normal
+                                    x = vertex_normals[3*i] * alpha + vertex_normals[3*i+1] * beta + vertex_normals[3*i+2]* gamma
+                                    y = vertex_normals[3*i+3] * alpha + vertex_normals[3*i+4] * beta + vertex_normals[3*i+5] * gamma
+                                    z = vertex_normals[3*i+6] * alpha + vertex_normals[3*i+7] * beta + vertex_normals[3*i+8] * gamma
+                                    normal = np.array([x, y, z])
+                                
+                                cos = max(0,- (normal[0]*GL.directional_light["direction"][0] + normal[1]*GL.directional_light["direction"][1] + normal[2]*GL.directional_light["direction"][2])) # cos of the angle between the normal and the light direction
 
-                            intensity = GL.directional_light["intensity"] * cos
-                            diffuse_light = intensity * np.array(diffuse_color)
-                            diffuse_light = np.clip(diffuse_light, 0, 255)
-                            # complete with specular, ambient and emissive light
+                                intensity = GL.directional_light["intensity"] * cos
+                                diffuse_light = intensity * np.array(diffuse_color)
+                                diffuse_light = np.clip(diffuse_light, 0, 255)
+                                # complete with specular, ambient and emissive light
 
+                                draw_color = emissive_color + diffuse_light + ambient_light + specular_light
+                                draw_color = np.clip(draw_color, 0, 255)
 
-
-                            draw_color = emissive_color + diffuse_light + ambient_light + specular_light
-                            draw_color = np.clip(draw_color, 0, 255)
                             draw_color = [int(i) for i in draw_color]
 
                         # Transparency
