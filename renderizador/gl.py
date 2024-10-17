@@ -16,6 +16,7 @@ import math  # Funções matemáticas
 import gpu  # Simula os recursos de uma GPU
 import numpy as np  # Biblioteca do Numpy
 import custom_funcs as cf
+from random import randint
 
 
 class GL:
@@ -28,6 +29,7 @@ class GL:
     p = None
     z_buffer = None
     ambient_intensity = 0.0
+    start_time = 0.0
 
     @staticmethod
     def setup(width, height, near=0.5, far=100):
@@ -40,10 +42,14 @@ class GL:
                               [0, 1, 0, 0],
                               [0, 0, 1, 0],
                               [0, 0, 0, 1]])]
-        GL.super_buffer = np.zeros((GL.width*2, GL.height*2, 3))
+        GL.super_buffer_0 = np.zeros((GL.width*2, GL.height*2, 3))
+        GL.super_buffer_1 = np.zeros((GL.width*2, GL.height*2, 3))
+        GL.current_super_buffer = GL.super_buffer_0
+        GL.current_super_buffer_index = 0
         GL.z_buffer = - np.inf * np.ones((GL.width*2, GL.height*2))
         GL.directional_light = {"direction": np.array([0, 0, -1]), "color": np.array([1, 1, 1]), "intensity": 0}
         GL.point_light = {"position": np.array([0, 0, 0]), "color": np.array([1, 1, 1]), "intensity": 0}
+        GL.start_time = time.time()
 
     @staticmethod
     def pushMatrix(matrix):
@@ -208,7 +214,8 @@ class GL:
                     texture_values = None,image = None,
                     transparency = 0,
                     vertex_normals = None,
-                    face_normal = None):
+                    face_normal = None,
+                    h = None):
         """Função usada para renderizar TriangleSet2D."""
 
         if image is not None:
@@ -230,8 +237,8 @@ class GL:
 
         # Iterate over each triangle
         for i in range(n_trigs):
-            #initialize diffuse, specular and ambient colors as 0
-            ambient_light  = np.array([0, 0, 0])
+            random_color = [randint(0,255),randint(0,255),randint(0,255)]
+            #initialize diffuse and specular colors as 0
             diffuse_light  = np.array([0, 0, 0])
             specular_light = np.array([0, 0, 0])
 
@@ -354,37 +361,51 @@ class GL:
                                     normal = np.array(alpha * vertex_normals[:, 0] + beta * vertex_normals[:, 1] + gamma * vertex_normals[:, 2]).T[0]
                                     normal = normal / np.linalg.norm(normal)
                                 
-                                cos = max(0,- (normal[0]*GL.directional_light["direction"][0] + normal[1]*GL.directional_light["direction"][1] + normal[2]*GL.directional_light["direction"][2])) # cos of the angle between the normal and the light direction
+                                #interpolate h vector
+                                h_interpolated = alpha * h[0] + beta * h[1] + gamma * h[2]
 
-                                intensity = GL.directional_light["intensity"] * cos
-                                diffuse_light = intensity * np.array(diffuse_color)
+                                # cos of the angle between the normal and the light direction
+                                cos_n_l = max(0,- (normal[0]*GL.directional_light["direction"][0] + 
+                                                   normal[1]*GL.directional_light["direction"][1] + 
+                                                   normal[2]*GL.directional_light["direction"][2])) 
+                                
+                                cos_n_h = max(0,- (normal[0]*h_interpolated[0] + normal[1]*h_interpolated[1] + normal
+                                [2]*h_interpolated[2]))
+                                
+                                diffuse_intensity = GL.directional_light["intensity"] * (cos_n_l + GL.ambient_intensity)
+                                diffuse_light = diffuse_intensity * np.array(diffuse_color)
                                 diffuse_light = np.clip(diffuse_light, 0, 255)
                                 # complete with specular, ambient and emissive light
+                                specular_intensity = 255 * GL.directional_light["intensity"] * (cos_n_h ** (shininess*128)) # FIXME
+                                specular_light = specular_intensity * np.array(specular_color)
+                                specular_light = np.clip(specular_light, 0, 255)
 
-                                draw_color = emissive_color + diffuse_light + ambient_light + specular_light
+                                draw_color = emissive_color + diffuse_light + specular_light
                                 draw_color = np.clip(draw_color, 0, 255)
 
                             draw_color = [int(i) for i in draw_color]
 
                         # Transparency
-                        previous_color = GL.super_buffer[sx, sy]
+                        previous_color = GL.current_super_buffer[sx, sy]
                         draw_color = [int((draw_color[0] * (1 - transparency) + previous_color[0] * transparency)),
                                         int((draw_color[1] * (1 - transparency) + previous_color[1] * transparency)),
                                         int((draw_color[2] * (1 - transparency) + previous_color[2] * transparency))]
                         
                         # Debug: draw normal components xyz as rgb color in the triangle
-                        #draw_color = cf.normal_to_color(normal)
+                        #draw_color = cf.vector_to_color(normal)
+                        #draw_color = [int(cos_n_h*255), int(cos_n_h*255), int(cos_n_h*255)]
+                        #draw_color = random_color
         
-                        GL.super_buffer[sx, sy] = draw_color
+                        GL.current_super_buffer[sx, sy] = draw_color
 
             
             # Draw the triangle on the screen (supersampled)
             for x in range(min_x, max_x + 1):
                 for y in range(min_y, max_y + 1):
-                        p0 = GL.super_buffer[x*2, y*2]
-                        p1 = GL.super_buffer[x*2 + 1, y*2]
-                        p2 = GL.super_buffer[x*2, y*2 + 1]
-                        p3 = GL.super_buffer[x*2 + 1, y*2 + 1]
+                        p0 = GL.current_super_buffer[x*2, y*2]
+                        p1 = GL.current_super_buffer[x*2 + 1, y*2]
+                        p2 = GL.current_super_buffer[x*2, y*2 + 1]
+                        p3 = GL.current_super_buffer[x*2 + 1, y*2 + 1]
                         #print(p0,p1,p2,p3)
                         gpu.GPU.draw_pixel([x, y], gpu.GPU.RGB8, (p0 + p1 + p2 + p3) / 4)    
 
@@ -406,6 +427,8 @@ class GL:
         # inicialmente, para o TriangleSet, o desenho das linhas com a cor emissiva
         # (emissiveColor), conforme implementar novos materias você deverá suportar outros
         # tipos de cores.
+
+        has_lights = GL.directional_light["intensity"] > 0 or GL.point_light["intensity"] > 0
 
         transparency = colors["transparency"]
         face_normal = None
@@ -450,7 +473,7 @@ class GL:
                 normal_m_h = np.array([normal_0_h, normal_1_h, normal_2_h]).T  # (4,3)
 
                 # Now you can multiply the 4x4 transformation matrix with the 4x3 normal matrix
-                transformed__normals_m = GL.look_at @ tranform_m @ normal_m_h
+                transformed__normals_m = np.linalg.inv(GL.look_at @ tranform_m).T @ normal_m_h
 
                 # Extract the transformed normal vectors to a list in xyz order
                 vertex_normals_transformed = transformed__normals_m[:3]
@@ -460,6 +483,9 @@ class GL:
             zs = (looked_at)[2]
             screen_m = cam_to_screen @ NDC_m
             screen_m = np.array(screen_m)
+
+            h = transformed_p[:3] + GL.directional_light["direction"] # h = l + v
+            h = h / np.linalg.norm(h)
 
             GL.triangleSet2D(
                 [
@@ -475,7 +501,8 @@ class GL:
                 image = image,
                 transparency = transparency,
                 vertex_normals = vertex_normals_transformed if vertex_normals is not None else None,
-                face_normal = face_normal
+                face_normal = face_normal,
+                h=h if has_lights else None
             )
 
     @staticmethod
@@ -539,11 +566,10 @@ class GL:
         GL.t_translation = [0, 0, 0]
         GL.t_scale = [1, 1, 1]
         GL.t_rotation = [0, 0, 0, 0]
-
         # O print abaixo é só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
         # print("Transform : ", end='')
-        if translation:
-            GL.t_translation = translation
+        if translation is not None:
+            GL.t_translation = np.array(translation).flatten()
             # print("translation = {0} ".format(GL.t_translation), end='') # imprime no terminal
         if scale:
             GL.t_scale = scale
@@ -553,6 +579,7 @@ class GL:
             # print("rotation = {0} ".format(GL.t_rotation), end='') # imprime no terminal
         # print("")
 
+        
         translate_m = cf.translation_matrix(
             GL.t_translation[0], GL.t_translation[1], GL.t_translation[2]
         )
@@ -722,7 +749,6 @@ class GL:
                     
 
         # General case without texture and colors per vertex
-        
         # First step: parse coordIndex into faces (groups of vertices)
         faces = []
         vertices = []
@@ -754,11 +780,7 @@ class GL:
         GL.indexedTriangleStripSet(coord, strips_flat,colors,
                                 colorPerVertex and color and colorIndex, vertex_colors if vertex_colors else colors,colorIndex,
                                 texCoord, image if current_texture else None) 
-
-
-
-
-
+        
     @staticmethod
     def sphere(radius, colors):
         """Função usada para renderizar Esferas."""
@@ -768,7 +790,7 @@ class GL:
         # precisar tesselar ela em triângulos, para isso encontre os vértices e defina
         # os triângulos.
 
-        points,vertex_normals = cf.sphere(radius,16,16)
+        points,vertex_normals = cf.sphere(radius,14,14)
         GL.triangleSet(points, colors,vertex_normals=vertex_normals)
 
 
@@ -826,10 +848,13 @@ class GL:
         # cor, intensidade. O campo de direção especifica o vetor de direção da iluminação
         # que emana da fonte de luz no sistema de coordenadas local. A luz é emitida ao
         # longo de raios paralelos de uma distância infinita.
+
+        directional_light_direction = np.array(direction)
+
         GL.directional_light = {"ambient_intensity":ambientIntensity,
                                 "color":color,
                                 "intensity":intensity,
-                                "direction":direction}
+                                "direction":directional_light_direction}
 
         # O print abaixo é só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
         print("DirectionalLight : ambientIntensity = {0}".format(ambientIntensity))
@@ -889,42 +914,94 @@ class GL:
         # Deve retornar a fração de tempo passada em fraction_changed
 
         # O print abaixo é só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
-        print(
-            "TimeSensor : cycleInterval = {0}".format(cycleInterval)
-        )  # imprime no terminal
-        print("TimeSensor : loop = {0}".format(loop))
+        
+        #cf.clear_framebuffer(GL.current_super_buffer)
+        
 
         # Esse método já está implementado para os alunos como exemplo
-        epoch = (
-            time.time()
-        )  # time in seconds since the epoch as a floating point number.
-        fraction_changed = (epoch % cycleInterval) / cycleInterval
+        if loop:
+            epoch = (time.time())  # time in seconds since the epoch as a floating point number.
+            relative_time = ((epoch - GL.start_time) % cycleInterval) / cycleInterval
+        else:
+            relative_time = np.clip(epoch - GL.start_time / cycleInterval, 0, 1)
 
-        return fraction_changed
+        #print(f"TimeSensor : fraction_changed = {relative_time}")
+        #print("TimeSensor : cycleInterval = {0}".format(cycleInterval))  # imprime no terminal
+        #print("TimeSensor : loop = {0}".format(loop))
+
+        return relative_time
 
     @staticmethod
     def splinePositionInterpolator(set_fraction, key, keyValue, closed):
         """Interpola não linearmente entre uma lista de vetores 3D."""
-        # Interpola não linearmente entre uma lista de vetores 3D. O campo keyValue possui
-        # uma lista com os valores a serem interpolados, key possui uma lista respectiva de chaves
-        # dos valores em keyValue, a fração a ser interpolada vem de set_fraction que varia de
-        # zeroa a um. O campo keyValue deve conter exatamente tantos vetores 3D quanto os
-        # quadros-chave no key. O campo closed especifica se o interpolador deve tratar a malha
-        # como fechada, com uma transições da última chave para a primeira chave. Se os keyValues
-        # na primeira e na última chave não forem idênticos, o campo closed será ignorado.
+        key = np.array(key)
+        keyValue = np.array(keyValue)
 
-        # O print abaixo é só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
-        print("SplinePositionInterpolator : set_fraction = {0}".format(set_fraction))
-        print(
-            "SplinePositionInterpolator : key = {0}".format(key)
-        )  # imprime no terminal
-        print("SplinePositionInterpolator : keyValue = {0}".format(keyValue))
-        print("SplinePositionInterpolator : closed = {0}".format(closed))
+        k_i_before = 0
+        for k_i_before in range(len(key) - 1): # Find the key interval
+            if key[k_i_before] <= set_fraction <= key[k_i_before + 1]:
+                k_i_before = k_i_before
+                k_i_plus = k_i_before + 1
+                break
 
-        # Abaixo está só um exemplo de como os dados podem ser calculados e transferidos
-        value_changed = [0.0, 0.0, 0.0]
+        key_value_parsed = keyValue.reshape(-1, 3)
+        print(f"SplinePositionInterpolator : key_value_parsed = \n{key_value_parsed}")
+
+        if set_fraction == key[k_i_before]:
+            return key_value_parsed[k_i_before:k_i_before+1]
+        if set_fraction == key[k_i_plus]:
+            return key_value_parsed[k_i_plus:k_i_plus+1]
+        
+        delta_key = key[k_i_plus] - key[k_i_before]
+        s_m = np.array([
+            ((set_fraction - key[k_i_before])/delta_key)**3,
+            ((set_fraction - key[k_i_before])/delta_key)**2,
+            (set_fraction - key[k_i_before])/delta_key,
+            1
+        ])
+
+        # Handle boundary cases for delta_value_0
+        if k_i_before == 0:
+            if closed:
+                deriv_0 = (key_value_parsed[-1] - key_value_parsed[1]) * 0.5
+            else:
+                deriv_0 = np.array([0, 0, 0])
+        else:
+            deriv_0 = (key_value_parsed[k_i_before-1] - key_value_parsed[k_i_before+1]) * 0.5
+
+
+        # Handle boundary cases for delta_value_1
+        if k_i_plus == len(key) - 1:
+            if closed:
+                deriv_1 = (key_value_parsed[0] - key_value_parsed[-2]) * 0.5
+            else:
+                deriv_1 = np.array([0, 0, 0])
+        else:
+            deriv_1 = (key_value_parsed[k_i_plus-1] - key_value_parsed[k_i_plus+1]) * 0.5
+
+        print(f"SplinePositionInterpolator : k_i_before = {k_i_before}")
+        print(f"SplinePositionInterpolator : k_i_plus = {k_i_plus}")
+
+        c = np.array([
+            key_value_parsed[k_i_before],
+            key_value_parsed[k_i_plus],
+            deriv_0,
+            deriv_1
+        ])
+
+        print(f"SplinePositionInterpolator : set_fraction = {set_fraction}")
+        print(f"SplinePositionInterpolator : key = {key}")
+        print(f"SplinePositionInterpolator : keyValue = {keyValue}")
+        print(f"SplinePositionInterpolator : closed = {closed}")
+        print(f"SplinePositionInterpolator : c = \n{c}")
+
+        # Calcular a interpolação
+        value_changed = s_m @ cf.get_hermite_m() @ c
+
+        print(f"SplinePositionInterpolator : value_changed = \n{value_changed}")
 
         return value_changed
+
 
     @staticmethod
     def orientationInterpolator(set_fraction, key, keyValue):

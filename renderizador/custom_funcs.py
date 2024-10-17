@@ -424,8 +424,27 @@ def cylinder(radius,height):
 
     return triangles
 
-def normal_to_color(normal):
+def vector_to_color(normal):
     return [int((normal[0] + 1) * 127.5), int((normal[1] + 1) * 127.5), int((normal[2] + 1) * 127.5)]
 
-def color_to_normal(color):
+def color_to_vector(color):
     return [(color[0] / 127.5) - 1, (color[1] / 127.5) - 1, (color[2] / 127.5) - 1]
+
+def get_hermite_m():
+    return np.array([
+        [ 2, -2,  1,  1],
+        [-3,  3, -2, -1],
+        [ 0,  0,  1,  0],
+        [ 1,  0,  0,  0]
+    ])
+
+
+def clear_framebuffer(buffer):
+    """
+    Clears the framebuffer by setting all pixels to the background color.
+
+    Parameters:
+    buffer (numpy.ndarray): The framebuffer to clear.
+    """
+    buffer.fill(0)
+
