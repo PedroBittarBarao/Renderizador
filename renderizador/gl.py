@@ -574,8 +574,8 @@ class GL:
         if scale:
             GL.t_scale = scale
             # print("scale = {0} ".format(GL.t_scale), end='') # imprime no terminal
-        if rotation:
-            GL.t_rotation = rotation
+        if rotation is not None:
+            GL.t_rotation = np.array(rotation).flatten()
             # print("rotation = {0} ".format(GL.t_rotation), end='') # imprime no terminal
         # print("")
 
@@ -708,6 +708,7 @@ class GL:
         # encontre os vértices e defina os triângulos.
 
         point = cf.box(size)
+        
 
         # Call the triangle rendering function with the prepared vertices and triangles
         GL.triangleSet(point, colors)
@@ -910,13 +911,9 @@ class GL:
         # Por outro lado, se o loop for TRUE no final de um ciclo, um nó dependente do
         # tempo continua a execução no próximo ciclo. O ciclo de um nó TimeSensor dura
         # cycleInterval segundos. O valor de cycleInterval deve ser maior que zero.
-
         # Deve retornar a fração de tempo passada em fraction_changed
 
-        # O print abaixo é só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
-        
         #cf.clear_framebuffer(GL.current_super_buffer)
-        
 
         # Esse método já está implementado para os alunos como exemplo
         if loop:
@@ -1005,27 +1002,37 @@ class GL:
 
     @staticmethod
     def orientationInterpolator(set_fraction, key, keyValue):
-        """Interpola entre uma lista de valores de rotação especificos."""
-        # Interpola rotações são absolutas no espaço do objeto e, portanto, não são cumulativas.
-        # Uma orientação representa a posição final de um objeto após a aplicação de uma rotação.
-        # Um OrientationInterpolator interpola entre duas orientações calculando o caminho mais
-        # curto na esfera unitária entre as duas orientações. A interpolação é linear em
-        # comprimento de arco ao longo deste caminho. Os resultados são indefinidos se as duas
-        # orientações forem diagonalmente opostas. O campo keyValue possui uma lista com os
-        # valores a serem interpolados, key possui uma lista respectiva de chaves
-        # dos valores em keyValue, a fração a ser interpolada vem de set_fraction que varia de
-        # zeroa a um. O campo keyValue deve conter exatamente tantas rotações 3D quanto os
-        # quadros-chave no key.
+        """Interpola entre uma lista de valores de rotação específicos."""
+        key = np.array(key)
+        keyValue = np.array(keyValue)
 
-        # O print abaixo é só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
+        # Find the correct interval for set_fraction
+        k_i_before = 0
+        for k_i_before in range(len(key) - 1):
+            if key[k_i_before] <= set_fraction <= key[k_i_before + 1]:
+                k_i_before = k_i_before
+                k_i_plus = k_i_before + 1
+                break
+
+        key_value_parsed = keyValue.reshape(-1, 4)
+
+        # Debug print statements (can be removed)
+        """ print(f"OrientationInterpolator : key_value_parsed = \n{key_value_parsed}")
         print("OrientationInterpolator : set_fraction = {0}".format(set_fraction))
-        print("OrientationInterpolator : key = {0}".format(key))  # imprime no terminal
-        print("OrientationInterpolator : keyValue = {0}".format(keyValue))
+        print("OrientationInterpolator : key = {0}".format(key))
+        print("OrientationInterpolator : keyValue = {0}".format(keyValue)) """
 
-        # Abaixo está só um exemplo de como os dados podem ser calculados e transferidos
-        value_changed = [0, 0, 1, 0]
+        # Get the rotations at the two keyframes
+        rotation_before = key_value_parsed[k_i_before]
+        rotation_after = key_value_parsed[k_i_plus]
 
-        return value_changed
+        # Compute the interpolation factor between the two keyframes
+        t = (set_fraction - key[k_i_before]) / (key[k_i_plus] - key[k_i_before])
+
+        # SLERP between rotation_before and rotation_after
+        interpolated_rotation = cf.slerp(rotation_before, rotation_after, t)
+
+        return interpolated_rotation
 
     # Para o futuro (Não para versão atual do projeto.)
     def vertex_shader(self, shader):

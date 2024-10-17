@@ -448,3 +448,27 @@ def clear_framebuffer(buffer):
     """
     buffer.fill(0)
 
+def slerp(rotation_before, rotation_after, t):
+    """Performs spherical linear interpolation (SLERP) between two rotations."""
+    # Extract the axis and angle components
+    axis_before = rotation_before[:3]
+    angle_before = rotation_before[3]
+
+    axis_after = rotation_after[:3]
+    angle_after = rotation_after[3]
+
+    # Calculate the shortest path between the two angles
+    # Normalize the rotation axes (just in case)
+    axis_before = axis_before / np.linalg.norm(axis_before)
+    axis_after = axis_after / np.linalg.norm(axis_after)
+
+    # Ensure the two axes are aligned for interpolation (they should be for rotations)
+    if not np.allclose(axis_before, axis_after):
+        print("Warning: Axes are not aligned. Interpolating using axis of first keyframe.")
+        axis_after = axis_before
+
+    # Perform linear interpolation on the angle component (SLERP for angle)
+    interpolated_angle = (1 - t) * angle_before + t * angle_after
+
+    # Return the interpolated rotation (axis remains the same, only the angle changes)
+    return np.hstack([axis_before, interpolated_angle])
