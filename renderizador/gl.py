@@ -913,7 +913,8 @@ class GL:
         # cycleInterval segundos. O valor de cycleInterval deve ser maior que zero.
         # Deve retornar a fração de tempo passada em fraction_changed
 
-        #cf.clear_framebuffer(GL.current_super_buffer)
+        cf.clear_framebuffer(GL.current_super_buffer)
+        GL.z_buffer = np.full((GL.width * 2, GL.height * 2), -np.inf)
 
         # Esse método já está implementado para os alunos como exemplo
         if loop:
