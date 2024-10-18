@@ -215,7 +215,7 @@ class GL:
                     transparency = 0,
                     vertex_normals = None,
                     face_normal = None,
-                    h = None):
+                    v = None):
         """Função usada para renderizar TriangleSet2D."""
 
         if image is not None:
@@ -362,23 +362,30 @@ class GL:
                                     normal = normal / np.linalg.norm(normal)
                                 
                                 #interpolate h vector
-                                h_interpolated = alpha * h[0] + beta * h[1] + gamma * h[2]
+                                v_interpolated = v[0] * alpha + v[1] * beta + v[2] * gamma
+                                v_interpolated = v_interpolated / np.linalg.norm(v_interpolated)
+
+                                h = GL.directional_light["direction"] + v_interpolated
+                                h_interpolated = h / np.linalg.norm(h)
 
                                 # cos of the angle between the normal and the light direction
-                                cos_n_l = max(0,- (normal[0]*GL.directional_light["direction"][0] + 
+                                cos_n_l = max(0,-(normal[0]*GL.directional_light["direction"][0] + 
                                                    normal[1]*GL.directional_light["direction"][1] + 
                                                    normal[2]*GL.directional_light["direction"][2])) 
                                 
-                                cos_n_h = max(0,- (normal[0]*h_interpolated[0] + normal[1]*h_interpolated[1] + normal
+                                cos_n_h = max(0,(normal[0]*h_interpolated[0] + normal[1]*h_interpolated[1] + normal
                                 [2]*h_interpolated[2]))
+
                                 
                                 diffuse_intensity = GL.directional_light["intensity"] * (cos_n_l + GL.ambient_intensity)
                                 diffuse_light = diffuse_intensity * np.array(diffuse_color)
-                                diffuse_light = np.clip(diffuse_light, 0, 255)
-                                # complete with specular, ambient and emissive light
-                                specular_intensity = 255 * GL.directional_light["intensity"] * (cos_n_h ** (shininess*128)) # FIXME
+
+                                specular_intensity = GL.directional_light["intensity"] * (cos_n_h ** (shininess*128))
+                                if specular_intensity > 1/255:
+                                    print(f"specular_intensity = {specular_intensity}")
                                 specular_light = specular_intensity * np.array(specular_color)
-                                specular_light = np.clip(specular_light, 0, 255)
+
+                                #print(f"specular_light = {specular_light}")
 
                                 draw_color = emissive_color + diffuse_light + specular_light
                                 draw_color = np.clip(draw_color, 0, 255)
@@ -392,7 +399,7 @@ class GL:
                                         int((draw_color[2] * (1 - transparency) + previous_color[2] * transparency))]
                         
                         # Debug: draw normal components xyz as rgb color in the triangle
-                        #draw_color = cf.vector_to_color(normal)
+                        #draw_color = cf.vector_to_color(h_interpolated)
                         #draw_color = [int(cos_n_h*255), int(cos_n_h*255), int(cos_n_h*255)]
                         #draw_color = random_color
         
@@ -484,8 +491,13 @@ class GL:
             screen_m = cam_to_screen @ NDC_m
             screen_m = np.array(screen_m)
 
-            h = transformed_p[:3] + GL.directional_light["direction"] # h = l + v
-            h = h / np.linalg.norm(h)
+            v1 = -1 * np.array(looked_at[:3, 0]).flatten() / np.linalg.norm(looked_at[:3, 0])  # For vertex 1
+            v2 = -1 * np.array(looked_at[:3, 1]).flatten() / np.linalg.norm(looked_at[:3, 1])  # For vertex 2
+            v3 = -1 * np.array(looked_at[:3, 2]).flatten() / np.linalg.norm(looked_at[:3, 2])  # For vertex 3
+            v = [v1, v2, v3]
+            #print(f"v = {v}")
+
+            
 
             GL.triangleSet2D(
                 [
@@ -502,7 +514,7 @@ class GL:
                 transparency = transparency,
                 vertex_normals = vertex_normals_transformed if vertex_normals is not None else None,
                 face_normal = face_normal,
-                h=h if has_lights else None
+                v=v if has_lights else None
             )
 
     @staticmethod
@@ -837,9 +849,7 @@ class GL:
             GL.directionalLight(0.0, [1, 1, 1], 1, [0, 0, -1])
 
         # O print abaixo é só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
-        print(
-            "NavigationInfo : headlight = {0}".format(headlight)
-        )  # imprime no terminal
+        #print("NavigationInfo : headlight = {0}".format(headlight))  # imprime no terminal
 
     @staticmethod
     def directionalLight(ambientIntensity, color, intensity, direction):
@@ -858,14 +868,14 @@ class GL:
                                 "direction":directional_light_direction}
 
         # O print abaixo é só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
-        print("DirectionalLight : ambientIntensity = {0}".format(ambientIntensity))
-        print("DirectionalLight : color = {0}".format(color))  # imprime no terminal
-        print(
-            "DirectionalLight : intensity = {0}".format(intensity)
-        )  # imprime no terminal
-        print(
-            "DirectionalLight : direction = {0}".format(direction)
-        )  # imprime no terminal
+        # print("DirectionalLight : ambientIntensity = {0}".format(ambientIntensity))
+        # print("DirectionalLight : color = {0}".format(color))  # imprime no terminal
+        # print(
+        #     "DirectionalLight : intensity = {0}".format(intensity)
+        # )  # imprime no terminal
+        # print(
+        #     "DirectionalLight : direction = {0}".format(direction)
+        # )  # imprime no terminal
 
     @staticmethod
     def pointLight(ambientIntensity, color, intensity, location):
@@ -943,7 +953,7 @@ class GL:
                 break
 
         key_value_parsed = keyValue.reshape(-1, 3)
-        print(f"SplinePositionInterpolator : key_value_parsed = \n{key_value_parsed}")
+        #print(f"SplinePositionInterpolator : key_value_parsed = \n{key_value_parsed}")
 
         if set_fraction == key[k_i_before]:
             return key_value_parsed[k_i_before:k_i_before+1]
@@ -977,8 +987,7 @@ class GL:
         else:
             deriv_1 = (key_value_parsed[k_i_plus-1] - key_value_parsed[k_i_plus+1]) * 0.5
 
-        print(f"SplinePositionInterpolator : k_i_before = {k_i_before}")
-        print(f"SplinePositionInterpolator : k_i_plus = {k_i_plus}")
+        
 
         c = np.array([
             key_value_parsed[k_i_before],
@@ -987,16 +996,18 @@ class GL:
             deriv_1
         ])
 
-        print(f"SplinePositionInterpolator : set_fraction = {set_fraction}")
-        print(f"SplinePositionInterpolator : key = {key}")
-        print(f"SplinePositionInterpolator : keyValue = {keyValue}")
-        print(f"SplinePositionInterpolator : closed = {closed}")
-        print(f"SplinePositionInterpolator : c = \n{c}")
+        # print(f"SplinePositionInterpolator : k_i_before = {k_i_before}")
+        # print(f"SplinePositionInterpolator : k_i_plus = {k_i_plus}")
+        # print(f"SplinePositionInterpolator : set_fraction = {set_fraction}")
+        # print(f"SplinePositionInterpolator : key = {key}")
+        # print(f"SplinePositionInterpolator : keyValue = {keyValue}")
+        # print(f"SplinePositionInterpolator : closed = {closed}")
+        # print(f"SplinePositionInterpolator : c = \n{c}")
 
         # Calcular a interpolação
         value_changed = s_m @ cf.get_hermite_m() @ c
 
-        print(f"SplinePositionInterpolator : value_changed = \n{value_changed}")
+        #print(f"SplinePositionInterpolator : value_changed = \n{value_changed}")
 
         return value_changed
 
