@@ -365,7 +365,7 @@ class GL:
                                 v_interpolated = v[0] * alpha + v[1] * beta + v[2] * gamma
                                 v_interpolated = v_interpolated / np.linalg.norm(v_interpolated)
 
-                                h = GL.directional_light["direction"] + v_interpolated
+                                h = -GL.directional_light["direction"] + v_interpolated
                                 h_interpolated = h / np.linalg.norm(h)
 
                                 # cos of the angle between the normal and the light direction
@@ -376,16 +376,11 @@ class GL:
                                 cos_n_h = max(0,(normal[0]*h_interpolated[0] + normal[1]*h_interpolated[1] + normal
                                 [2]*h_interpolated[2]))
 
-                                
                                 diffuse_intensity = GL.directional_light["intensity"] * (cos_n_l + GL.ambient_intensity)
                                 diffuse_light = diffuse_intensity * np.array(diffuse_color)
 
                                 specular_intensity = GL.directional_light["intensity"] * (cos_n_h ** (shininess*128))
-                                if specular_intensity > 1/255:
-                                    print(f"specular_intensity = {specular_intensity}")
-                                specular_light = specular_intensity * np.array(specular_color)
-
-                                #print(f"specular_light = {specular_light}")
+                                specular_light = [int(i) for i in specular_intensity * np.array(specular_color)]
 
                                 draw_color = emissive_color + diffuse_light + specular_light
                                 draw_color = np.clip(draw_color, 0, 255)
@@ -398,8 +393,8 @@ class GL:
                                         int((draw_color[1] * (1 - transparency) + previous_color[1] * transparency)),
                                         int((draw_color[2] * (1 - transparency) + previous_color[2] * transparency))]
                         
-                        # Debug: draw normal components xyz as rgb color in the triangle
-                        #draw_color = cf.vector_to_color(h_interpolated)
+                        # Debug: draw s vectors components xyz as rgb color in the triangle
+                        #draw_color = cf.vector_to_color(GL.directional_light["direction"])
                         #draw_color = [int(cos_n_h*255), int(cos_n_h*255), int(cos_n_h*255)]
                         #draw_color = random_color
         
