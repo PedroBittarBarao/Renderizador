@@ -394,11 +394,12 @@ class GL:
                                         int((draw_color[2] * (1 - transparency) + previous_color[2] * transparency))]
                         
                         # Debug: draw s vectors components xyz as rgb color in the triangle
-                        #draw_color = cf.vector_to_color(GL.directional_light["direction"])
+                        #draw_color = cf.vector_to_color(h_interpolated)
                         #draw_color = [int(cos_n_h*255), int(cos_n_h*255), int(cos_n_h*255)]
                         #draw_color = random_color
         
                         GL.current_super_buffer[sx, sy] = draw_color
+
 
             
             # Draw the triangle on the screen (supersampled)
@@ -491,8 +492,6 @@ class GL:
             v3 = -1 * np.array(looked_at[:3, 2]).flatten() / np.linalg.norm(looked_at[:3, 2])  # For vertex 3
             v = [v1, v2, v3]
             #print(f"v = {v}")
-
-            
 
             GL.triangleSet2D(
                 [
@@ -715,7 +714,6 @@ class GL:
         # encontre os vértices e defina os triângulos.
 
         point = cf.box(size)
-        
 
         # Call the triangle rendering function with the prepared vertices and triangles
         GL.triangleSet(point, colors)
@@ -792,14 +790,17 @@ class GL:
     @staticmethod
     def sphere(radius, colors):
         """Função usada para renderizar Esferas."""
+        # https://www.web3d.org/specifications/X3Dv4/ISO-IEC19775-1v4-IS/Part01/components/geometry3D.html#Sphere
         # A função sphere é usada para desenhar esferas na cena. O esfera é centrada no
         # (0, 0, 0) no sistema de coordenadas local. O argumento radius especifica o
         # raio da esfera que está sendo criada. Para desenha essa esfera você vai
         # precisar tesselar ela em triângulos, para isso encontre os vértices e defina
         # os triângulos.
 
-        points,vertex_normals = cf.sphere(radius,14,14)
-        GL.triangleSet(points, colors,vertex_normals=vertex_normals)
+        
+        triangulos,normals = cf.sphere(radius)
+        
+        GL.triangleSet(triangulos, colors, vertex_normals=normals)
 
 
     @staticmethod
@@ -922,8 +923,8 @@ class GL:
         GL.z_buffer = np.full((GL.width * 2, GL.height * 2), -np.inf)
 
         # Esse método já está implementado para os alunos como exemplo
+        epoch = (time.time())  # time in seconds since the epoch as a floating point number.
         if loop:
-            epoch = (time.time())  # time in seconds since the epoch as a floating point number.
             relative_time = ((epoch - GL.start_time) % cycleInterval) / cycleInterval
         else:
             relative_time = np.clip(epoch - GL.start_time / cycleInterval, 0, 1)
@@ -956,14 +957,15 @@ class GL:
             return key_value_parsed[k_i_plus:k_i_plus+1]
         
         delta_key = key[k_i_plus] - key[k_i_before]
+        s = (set_fraction - key[k_i_before])/delta_key
         s_m = np.array([
-            ((set_fraction - key[k_i_before])/delta_key)**3,
-            ((set_fraction - key[k_i_before])/delta_key)**2,
-            (set_fraction - key[k_i_before])/delta_key,
+            s**3,
+            s**2,
+            s,
             1
         ])
 
-        # Handle boundary cases for delta_value_0
+        # Handle boundary cases for deriv_0
         if k_i_before == 0:
             if closed:
                 deriv_0 = (key_value_parsed[-1] - key_value_parsed[1]) * 0.5

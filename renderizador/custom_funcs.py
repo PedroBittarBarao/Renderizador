@@ -211,78 +211,76 @@ def generate_mipmap(image):
 
     return mipmap_levels
 
-def sphere(raio, div_lon, div_lat):
-    """
-    Generates a 3D sphere mesh with specified radius and divisions.
-    Args:
-        raio (float): The radius of the sphere.
-        div_lon (int): The number of longitudinal divisions (slices).
-        div_lat (int): The number of latitudinal divisions (stacks).
-    Returns:
-        tuple: A tuple containing:
-            - triangles (numpy.ndarray): A flattened array of triangle vertices.
-            - triangle_normals (numpy.ndarray): A flattened array of triangle normals.
-    """
-    points = []
-    triangles = []
+def sphere(radius, div_long = 15, div_lat = 15):
+
+    vertices = []
+    delta_theta = 2 * np.pi / div_long
+    delta_phi = np.pi / div_lat
+    triangulos = []
     normals = []
     triangle_normals = []
-
-    delta_theta = 2 * np.pi / div_lon
-    delta_phi = np.pi / div_lat
-
-    # Gerando pontos da esfera
-    for i in range(div_lon + 1):
+    
+    for i in range(div_long+1):
         theta = i * delta_theta
-        for j in range(1, div_lat):  # Evitamos os pólos direto aqui
+        for j in range(1,div_lat):
             phi = j * delta_phi
+            x = radius * np.sin(phi) * np.cos(theta)
+            y = radius * np.sin(phi) * np.sin(theta)
+            z = radius * np.cos(phi)
+            vertices.append([x, y, z])
+            normals.append(np.array([x, y, z])/np.linalg.norm([x, y, z]))
 
-            x = raio * np.sin(phi) * np.cos(theta)
-            y = raio * np.sin(phi) * np.sin(theta)
-            z = raio * np.cos(phi)
-            points.append([x, y, z])
+    vertices.append([0, 0, radius])
+    normals.append(np.array([0, 0, 1]))
 
-            norm = np.array([x, y, z]) / np.linalg.norm([x, y, z])
-            normals.append(norm)
+    vertices.append([0, 0, -radius])
+    normals.append(np.array([0, 0, -1]))
 
-    # Adiciona o pólo superior e inferior
-    points.append([0, 0, raio])  # Pólo norte
-    normals.append([0, 0, 1])
+    polo_norte = len(vertices) - 2
+    polo_sul = len(vertices) - 1
+    
+    for i in range(div_long):
+        for j in range(div_lat-2):
+            p1 = i * (div_lat-1) + j
+            p2 = p1 +1
+            p3 = (i + 1) * (div_lat-1) + j
+            p4 = p3 + 1
 
-    points.append([0, 0, -raio])  # Pólo sul
-    normals.append([0, 0, -1])
+            v1 = vertices[p1]
+            v2 = vertices[p2]
+            v3 = vertices[p3]
+            v4 = vertices[p4]
 
-    pole_north = len(points) - 2
-    pole_south = len(points) - 1
+            triangulos.extend([v1[0], v1[1], v1[2], v2[0], v2[1], v2[2], v3[0], v3[1], v3[2]])
+            triangle_normals.append([normals[p1],normals[p2],normals[p3]])
+            v2, v3, v4 = v3, v2, v4
+            triangulos.extend([v2[0], v2[1], v2[2], v3[0], v3[1], v3[2], v4[0], v4[1], v4[2]])
+            triangle_normals.append([normals[p3],normals[p2],normals[p4]])
+    
+        v1 = vertices[polo_norte] 
+        v2 = vertices[i * (div_lat-1)]
+        v3 = vertices[(i + 1) % div_long* (div_lat-1)]
 
-    # Conectando vértices em triângulos
-    for i in range(div_lon):
-        for j in range(div_lat - 2):
-            # Índices dos vértices do triângulo (dois triângulos por quad)
-            p1 = i * (div_lat - 1) + j
-            p2 = p1 + div_lat - 1
-            p3 = p1 + 1
-            p4 = p2 + 1
+        triangulos.extend([v1[0], v1[1], v1[2], v2[0], v2[1], v2[2], v3[0], v3[1], v3[2]])
+        triangle_normals.append([
+            normals[polo_norte],
+            normals[i * (div_lat-1)],
+            normals[(i + 1) % div_long* (div_lat-1)]
+            ])
 
-            # Primeiro triângulo
-            triangles.append([points[p1], points[p2], points[p3]])
-            triangle_normals.append([normals[p1], normals[p2], normals[p3]])
-            # Segundo triângulo
-            triangles.append([points[p3], points[p2], points[p4]])
-            triangle_normals.append([normals[p3], normals[p2], normals[p4]])
 
-        # Conectar os triângulos com o pólo norte
-        triangles.append([points[pole_north], points[i * (div_lat - 1)], points[(i + 1) % div_lon * (div_lat - 1)]])
-        triangle_normals.append([normals[pole_north], normals[i * (div_lat - 1)], normals[(i + 1) % div_lon * (div_lat - 1)]])
+        v1 = vertices[polo_sul]
+        v2 = vertices[(i + 1) * (div_lat-1) + div_lat-2]
+        v3 = vertices[i * (div_lat-1) + div_lat-2]
 
-        # Conectar os triângulos com o pólo sul
-        triangles.append([points[pole_south], points[(i + 1) % div_lon * (div_lat - 1) + (div_lat - 2)], points[i * (div_lat - 1) + (div_lat - 2)]])
-        triangle_normals.append([normals[pole_south], normals[(i + 1) % div_lon * (div_lat - 1) + (div_lat - 2)], normals[i * (div_lat - 1) + (div_lat - 2)]])
-
-    triangles = np.array(triangles).flatten()
-    triangle_normals = np.array(triangle_normals).flatten()
-
-    return triangles, triangle_normals
+        triangulos.extend([v1[0], v1[1], v1[2], v2[0], v2[1], v2[2], v3[0], v3[1], v3[2]])
+        triangle_normals.append([
+            normals[polo_sul],
+            normals[(i + 1) * (div_lat-1) + div_lat-2],
+            normals[i * (div_lat-1) + div_lat-2]
+            ])
+        
+    return np.array(triangulos), np.array(triangle_normals).flatten()
 
 
 def cone(bottom_radius, height):
@@ -301,7 +299,7 @@ def cone(bottom_radius, height):
     delta_theta = 2 * np.pi / div_lon  # Ângulo entre as fatias
 
     # Adicionar o vértice do topo
-    top_vertex = [0, height, 0]
+    top_vertex = [0, height /2, 0]
     points.append(top_vertex)
 
     # Gerar vértices ao redor da base
@@ -309,10 +307,10 @@ def cone(bottom_radius, height):
         theta = i * delta_theta
         x = bottom_radius * np.cos(theta)
         z = bottom_radius * np.sin(theta)
-        points.append([x, 0, z])
+        points.append([x, -height/2, z])
 
     # Adicionar o vértice central da base
-    base_center = [0, 0, 0]
+    base_center = [0, -height/2, 0]
     points.append(base_center)
 
     # Conectar o topo aos vértices da base para formar as faces laterais
@@ -402,7 +400,7 @@ def cylinder(radius,height):
             phi = j * delta_phi
 
             x = radius * np.cos(theta)
-            y = phi
+            y = phi - height / 2
             z = radius * np.sin(theta)
             points.append([x, y, z])
 
